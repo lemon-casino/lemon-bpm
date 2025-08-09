@@ -1,0 +1,476 @@
+/* BPM审批中心样式 */
+
+// BPM页面通用卡片样式
+.bpm-card {
+  border-radius: var(--card-border-radius);
+  box-shadow: var(--card-shadow);
+  transition: all var(--transition-time-base);
+  margin-bottom: var(--block-spacing);
+  overflow: hidden;
+  height: calc(100vh - 160px); /* 设置合适的固定高度 */
+  display: flex;
+  flex-direction: column;
+  
+  &:hover {
+    box-shadow: var(--card-shadow-hover);
+  }
+  
+  .bpm-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: var(--card-header-height);
+    padding: 0 var(--card-padding);
+    border-bottom: 1px solid var(--border-color-light);
+    flex-shrink: 0; /* 不参与flex缩放 */
+    
+    .card-title {
+      font-size: var(--font-size-lg);
+      font-weight: bold;
+      color: var(--el-text-color-primary);
+      display: flex;
+      align-items: center;
+      
+      .title-icon {
+        margin-right: 8px;
+        color: var(--el-color-primary);
+      }
+    }
+    
+    .card-action {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+  }
+  
+  .bpm-card-body {
+    padding: var(--card-padding);
+    flex: 1;
+    overflow-y: auto; /* 内容区域可滚动 */
+    position: relative; /* 为内部绝对定位元素提供参考 */
+  }
+}
+
+// 流程状态标签样式
+.bpm-status-tag {
+  &.status-running {
+    background-color: var(--el-color-primary-light-8);
+    color: var(--el-color-primary);
+    border: 1px solid var(--el-color-primary-light-5);
+  }
+  
+  &.status-completed {
+    background-color: var(--el-color-success-light-8);
+    color: var(--el-color-success);
+    border: 1px solid var(--el-color-success-light-5);
+  }
+  
+  &.status-canceled {
+    background-color: var(--el-color-info-light-8);
+    color: var(--el-color-info);
+    border: 1px solid var(--el-color-info-light-5);
+  }
+  
+  &.status-error {
+    background-color: var(--el-color-danger-light-8);
+    color: var(--el-color-danger);
+    border: 1px solid var(--el-color-danger-light-5);
+  }
+}
+
+// 发起流程 - 流程卡片网格
+.process-definition-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+  
+  .process-definition-item {
+    position: relative;
+    height: 100px;
+    border-radius: var(--border-radius-md);
+    background-color: var(--card-bg-color);
+    border: 1px solid var(--border-color-light);
+    padding: 16px;
+    cursor: pointer;
+    transition: all var(--transition-time-base);
+    overflow: hidden;
+    
+    &:hover {
+      transform: translateY(-5px);
+      border-color: var(--el-color-primary-light-5);
+      box-shadow: var(--shadow-base);
+      
+      .process-action {
+        opacity: 1;
+      }
+    }
+    
+    .process-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--border-radius-circle);
+      background: var(--gradient-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+      color: white;
+      font-weight: bold;
+    }
+    
+    .process-name {
+      font-size: var(--font-size-lg);
+      color: var(--el-text-color-primary);
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .process-desc {
+      font-size: var(--font-size-sm);
+      color: var(--el-text-color-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .process-action {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      opacity: 0;
+      transition: opacity var(--transition-time-base);
+    }
+    
+    .process-category {
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      font-size: var(--font-size-sm);
+      color: var(--el-color-primary);
+    }
+  }
+}
+
+// 流程分类导航
+.process-category-nav {
+  border-right: 1px solid var(--border-color-light);
+  padding-right: 16px;
+  
+  .category-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    margin-bottom: 4px;
+    border-radius: var(--border-radius-base);
+    cursor: pointer;
+    transition: all var(--transition-time-base);
+    
+    &:hover {
+      background-color: var(--el-color-primary-light-9);
+    }
+    
+    &.active {
+      background-color: var(--el-color-primary-light-8);
+      color: var(--el-color-primary);
+      font-weight: bold;
+    }
+    
+    .category-icon {
+      margin-right: 8px;
+    }
+    
+    .category-name {
+      flex: 1;
+    }
+    
+    .category-count {
+      font-size: var(--font-size-sm);
+      color: var(--el-text-color-secondary);
+      background-color: var(--el-fill-color-lighter);
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+  }
+}
+
+// 流程状态卡片
+.process-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+  
+  .stat-card {
+    background-color: var(--card-bg-color);
+    border-radius: var(--border-radius-md);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-light);
+    cursor: pointer;
+    transition: all var(--transition-time-base);
+    
+    &:hover {
+      transform: translateY(-5px);
+      box-shadow: var(--shadow-base);
+    }
+    
+    .stat-title {
+      font-size: var(--font-size-sm);
+      color: var(--el-text-color-secondary);
+      margin-bottom: 12px;
+    }
+    
+    .stat-value {
+      font-size: var(--font-size-xxl);
+      font-weight: bold;
+      color: var(--el-color-primary);
+    }
+    
+    &.running {
+      border-left: 4px solid var(--el-color-primary);
+      .stat-value { color: var(--el-color-primary); }
+    }
+    
+    &.completed {
+      border-left: 4px solid var(--el-color-success);
+      .stat-value { color: var(--el-color-success); }
+    }
+    
+    &.canceled {
+      border-left: 4px solid var(--el-color-info);
+      .stat-value { color: var(--el-color-info); }
+    }
+    
+    &.error {
+      border-left: 4px solid var(--el-color-danger);
+      .stat-value { color: var(--el-color-danger); }
+    }
+  }
+}
+
+// 待办任务列表
+.todo-task-list {
+  height: 100%;
+  overflow-y: auto;
+  
+  .task-item {
+    border-radius: var(--border-radius-md);
+    margin-bottom: 12px;
+    border: 1px solid var(--border-color-light);
+    overflow: hidden;
+    transition: all var(--transition-time-base);
+    
+    &:hover {
+      box-shadow: var(--shadow-base);
+      border-color: var(--el-color-primary-light-5);
+    }
+    
+    .task-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px;
+      background-color: var(--el-fill-color-light);
+      border-bottom: 1px solid var(--border-color-light);
+      
+      .task-process-name {
+        font-size: var(--font-size-lg);
+        font-weight: bold;
+        color: var(--el-text-color-primary);
+      }
+      
+      .task-status {
+        font-size: var(--font-size-sm);
+        padding: 2px 8px;
+        border-radius: 4px;
+      }
+    }
+    
+    .task-body {
+      padding: 16px;
+      
+      .task-info {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-bottom: 16px;
+        
+        .info-item {
+          display: flex;
+          flex-direction: column;
+          
+          .info-label {
+            font-size: var(--font-size-sm);
+            color: var(--el-text-color-secondary);
+            margin-bottom: 4px;
+          }
+          
+          .info-value {
+            color: var(--el-text-color-primary);
+          }
+        }
+      }
+      
+      .task-summary {
+        background-color: var(--el-fill-color-lighter);
+        padding: 12px;
+        border-radius: var(--border-radius-base);
+        margin-bottom: 16px;
+        
+        .summary-title {
+          font-weight: bold;
+          margin-bottom: 8px;
+        }
+        
+        .summary-item {
+          display: flex;
+          margin-bottom: 4px;
+          
+          .summary-label {
+            color: var(--el-text-color-secondary);
+            margin-right: 8px;
+          }
+          
+          .summary-value {
+            color: var(--el-text-color-primary);
+          }
+        }
+      }
+      
+      .task-action {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+      }
+    }
+    
+    // 优先级样式
+    &.priority-high {
+      border-left: 4px solid var(--el-color-danger);
+    }
+    
+    &.priority-medium {
+      border-left: 4px solid var(--el-color-warning);
+    }
+    
+    &.priority-low {
+      border-left: 4px solid var(--el-color-info);
+    }
+  }
+}
+
+// 高级筛选区域样式
+.bpm-advanced-filter {
+  background-color: var(--card-bg-color);
+  border-radius: var(--border-radius-md);
+  padding: 16px;
+  box-shadow: var(--shadow-base);
+  margin-bottom: 16px;
+  
+  .filter-title {
+    font-size: var(--font-size-lg);
+    font-weight: bold;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    
+    .filter-icon {
+      margin-right: 8px;
+      color: var(--el-color-primary);
+    }
+  }
+  
+  .filter-form {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    
+    @media (max-width: 1200px) {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    
+    @media (max-width: 768px) {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  .filter-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 16px;
+    gap: 12px;
+  }
+}
+
+// 搜索区域美化
+.bpm-search-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+  
+  .search-input {
+    flex: 1;
+    min-width: 280px;
+    max-width: 400px;
+  }
+  
+  .filter-dropdown {
+    margin-left: 12px;
+  }
+}
+
+// 表格样式优化
+.bpm-table {
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  height: calc(100% - 60px); /* 留出分页区域的高度 */
+  
+  .el-table__header-wrapper {
+    th {
+      background-color: var(--el-fill-color-light);
+      font-weight: bold;
+    }
+  }
+  
+  .el-table__body-wrapper {
+    overflow-y: auto;
+    max-height: calc(100% - 40px); /* 表头高度 */
+  }
+  
+  .el-table__row {
+    transition: background-color var(--transition-time-fast);
+    
+    &:hover {
+      background-color: var(--el-fill-color-lighter);
+    }
+  }
+}
+
+// 任务卡片布局
+.task-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-gap: 16px;
+  min-height: 200px; /* 确保有最小高度 */
+  margin-bottom: 16px; /* 与分页组件保持间距 */
+}
+
+// 分页容器样式
+.pagination-container {
+  margin-top: 16px;
+  padding: 8px 0;
+  display: flex;
+  justify-content: flex-end;
+  position: sticky;
+  bottom: 0;
+  background-color: var(--el-bg-color);
+  z-index: 10;
+} 

@@ -1,0 +1,164 @@
+:root {
+  --login-bg-color: #293146;
+
+  --left-menu-max-width: 200px;
+
+  --left-menu-min-width: 64px;
+
+  --left-menu-bg-color: #001529;
+
+  --left-menu-bg-light-color: #0c2238;
+
+  --left-menu-bg-active-color: #1890ff;
+
+  --left-menu-text-color: #bfcbd9;
+
+  --left-menu-text-active-color: #fff;
+
+  --left-menu-collapse-bg-active-color: #1890ff;
+  /* left menu end */
+
+  /* logo start */
+  --logo-height: 50px;
+
+  --logo-title-text-color: #fff;
+  /* logo end */
+
+  /* header start */
+  --top-header-bg-color: '#fff';
+
+  --top-header-text-color: 'inherit';
+
+  --top-header-hover-color: #f6f6f6;
+
+  --top-tool-height: var(--logo-height);
+
+  --top-tool-p-x: 0;
+
+  --tags-view-height: 35px;
+  /* header start */
+
+  /* tab menu start */
+  --tab-menu-max-width: 80px;
+
+  --tab-menu-min-width: 30px;
+
+  --tab-menu-collapse-height: 36px;
+  /* tab menu end */
+
+  --app-content-padding: 20px;
+
+  --app-content-bg-color: #f5f7f9;
+
+  --app-footer-height: 50px;
+
+  --transition-time-02: 0.2s;
+
+  /* 新增设计元素变量 */
+  /* 基础动画时间 */
+  --transition-time-base: 0.3s;
+  --transition-time-fast: 0.15s;
+  --transition-time-slow: 0.45s;
+  
+  /* 卡片样式 */
+  --card-border-radius: 8px;
+  --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --card-shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --card-bg-color: #ffffff;
+  --card-header-height: 56px;
+  --card-padding: 20px;
+  
+  /* 布局边距 */
+  --layout-gutter: 16px;
+  --section-gap: 24px;
+  --block-spacing: 16px;
+  
+  /* 字体 */
+  --font-family-base: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-size-base: 14px;
+  --font-size-sm: 12px;
+  --font-size-lg: 16px;
+  --font-size-xl: 20px;
+  --font-size-xxl: 24px;
+  
+  /* 线条颜色和尺寸 */
+  --border-color-light: #f0f0f0;
+  --border-color-base: #e4e7ed;
+  --border-color-dark: #dcdfe6;
+  --border-width-base: 1px;
+  --border-radius-base: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  --border-radius-circle: 50%;
+  
+  /* 渐变色 */
+  --gradient-primary: linear-gradient(135deg, var(--el-color-primary), var(--el-color-primary-light-3));
+  --gradient-success: linear-gradient(135deg, #67C23A, #95D475);
+  --gradient-warning: linear-gradient(135deg, #E6A23C, #F3D19E);
+  --gradient-danger: linear-gradient(135deg, #F56C6C, #FAB6B6);
+  --gradient-info: linear-gradient(135deg, #909399, #C8C9CC);
+  
+  /* 阴影 */
+  --shadow-base: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  --shadow-light: 0 2px 8px 0 rgba(0, 0, 0, 0.03);
+  --shadow-dark: 0 4px 16px 0 rgba(0, 0, 0, 0.08);
+  --shadow-header: 0 1px 4px rgba(0, 0, 0, 0.08);
+  
+  /* 图表颜色 */
+  --chart-color-1: #5470c6;
+  --chart-color-2: #91cc75;
+  --chart-color-3: #fac858;
+  --chart-color-4: #ee6666;
+  --chart-color-5: #73c0de;
+  --chart-color-6: #3ba272;
+  --chart-color-7: #fc8452;
+  --chart-color-8: #9a60b4;
+  
+  /* z-index层级管理 */
+  --z-index-normal: 1;
+  --z-index-dropdown: 1000;
+  --z-index-sticky: 1020;
+  --z-index-fixed: 1030;
+  --z-index-modal-backdrop: 1040;
+  --z-index-modal: 1050;
+  --z-index-popover: 1060;
+  --z-index-tooltip: 1070;
+  
+  /* 新增菜单美化所需的变量 */
+  --menu-item-height: 46px;
+  --menu-item-margin: 8px 12px;  
+  --menu-item-radius: var(--border-radius-base);
+  --menu-item-font-weight: 400;
+  --menu-item-active-font-weight: 500;
+  --menu-item-hover-transform: translateY(-1px);
+  --menu-item-shadow: 0 4px 12px rgba(var(--el-color-primary-rgb), 0.3);
+  --menu-sub-item-height: 42px;
+  --menu-sub-item-margin: 4px 10px;
+  --menu-icon-margin-right: 10px;
+}
+
+.dark {
+  --app-content-bg-color: var(--el-bg-color);
+  --card-bg-color: #1d1e1f;
+  --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  --card-shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.3);
+  --border-color-light: #303133;
+  --border-color-base: #414243;
+  --border-color-dark: #505255;
+}
+
+html,
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-base);
+}
+
+*,
+:after,
+:before {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
