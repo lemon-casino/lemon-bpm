@@ -71,7 +71,6 @@ export const useFormCollaboration = (config: Config) => {
       responseTimer = null
     }
   }
-
   const handleNoResponse = (targetId: number) => {
     pendingResponseUserId.value = null
     const next = nextUserId(targetId)
