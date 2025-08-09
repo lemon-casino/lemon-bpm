@@ -53,20 +53,12 @@
               <el-icon class="mr-5px"><Link /></el-icon>
               <span>在浏览器打开</span>
             </el-button>
-            <!-- 表单协同编辑面板 - 靠右横排显示 -->
+            <!-- 在线用户面板 -->
             <div class="flex-shrink-0" style="margin-left: 20px">
               <FormCollaborationPanel
                 v-if="processDefinition?.formType === BpmModelFormType.NORMAL"
-                :locked-fields="lockedFields"
-                :collaborating-users="collaboratingUsers"
-                :current-editing-field="currentEditingField"
-                :is-collaboration-enabled="isCollaborationEnabled"
-                :field-display-names="getFieldDisplayNames()"
                 :process-users="processUsers"
                 :confirmed-online-users="confirmedOnlineUsers"
-                :is-right-layout="true"
-                @toggle-collaboration="toggleCollaboration"
-                class="collaboration-panel-right"
               />
             </div>
           </div>
@@ -288,7 +280,7 @@ import approveSvg from '@/assets/svgs/bpm/approve.svg'
 import rejectSvg from '@/assets/svgs/bpm/reject.svg'
 import cancelSvg from '@/assets/svgs/bpm/cancel.svg'
 import { useEventBus } from '@/hooks/web/useEventBus'
-import { useWebSocketMessage, FormCollaborationMessageType } from '@/hooks/web/useWebSocketMessage'
+import { useWebSocketMessage } from '@/hooks/web/useWebSocketMessage'
 import { useFormCollaboration } from '@/hooks/web/useFormCollaboration'
 import FormCollaborationPanel from '@/components/bpm/FormCollaborationPanel.vue'
 import { ElMessage } from 'element-plus'
@@ -329,35 +321,17 @@ const writableFields: Array<string> = [] // 表单可以编辑的字段
 const { emit } = useEventBus('processInstance')
 
 // 使用 WebSocket 消息
-const { sendMessage, sendBroadcast, ensureConnection, initConnection, onMessage, onBroadcast } = useWebSocketMessage()
+const { sendMessage, sendBroadcast, ensureConnection, initConnection } = useWebSocketMessage()
 
 // 管理员相关属性
 const isAdmin = ref(false) // 是否为管理员
 
-// 表单协同编辑功能
+// 在线用户检测
 const userStore = useUserStore()
 const currentUser = userStore.getUser
-// 使用链式在线检测的协同编辑功能
-const {
-  lockedFields,
-  collaboratingUsers,
-  currentEditingField,
-  isCollaborationEnabled,
-  processUsers,
-  confirmedOnlineUsers,
-  initCollaboration,
-  cleanupCollaboration,
-  handleFieldFocus,
-  handleFieldBlur,
-  handleFieldChange,
-  handleCursorPosition,
-  toggleCollaboration,
-  handleRemoteMessage
-} = useFormCollaboration({
+const { processUsers, confirmedOnlineUsers, initCollaboration } = useFormCollaboration({
   processInstanceId: props.id,
-  currentUser: currentUser,
-  sendMessage,
-  sendBroadcast
+  currentUser
 })
 
 /** 获得详情 */
@@ -1168,142 +1142,20 @@ const isHtmlContent = (content: string) => {
 const onFormMounted = () => {
   console.log('表单挂载完成，初始化协同编辑功能')
   
-  // 初始化协同编辑功能
+  // 初始化在线检测
   if (processDefinition.value?.formType === BpmModelFormType.NORMAL) {
     initCollaboration()
-    setupFormEventListeners()
   }
-}
-
-/**
- * 设置表单事件监听器
- */
-const setupFormEventListeners = () => {
-  if (!fApi.value) return
-  
-  nextTick(() => {
-    // 获取所有表单字段元素
-    const formElements = document.querySelectorAll('.form-component input, .form-component textarea, .form-component select')
-    
-    formElements.forEach((element: Element) => {
-      const inputElement = element as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-      const fieldName = inputElement.name || inputElement.getAttribute('data-field')
-      
-      if (!fieldName) return
-      
-      // 添加焦点事件监听
-      inputElement.addEventListener('focus', () => {
-        handleFieldFocus(fieldName)
-      })
-      
-      // 添加失焦事件监听
-      inputElement.addEventListener('blur', () => {
-        handleFieldBlur(fieldName)
-      })
-      
-      // 添加输入事件监听
-      inputElement.addEventListener('input', (event) => {
-        const target = event.target as HTMLInputElement | HTMLTextAreaElement
-        handleFieldChange(fieldName, target.value)
-      })
-      
-      // 添加光标位置监听（仅对文本输入框）
-      if (inputElement.tagName === 'INPUT' || inputElement.tagName === 'TEXTAREA') {
-        inputElement.addEventListener('selectionchange', () => {
-          const textElement = inputElement as HTMLInputElement | HTMLTextAreaElement
-          handleCursorPosition(fieldName, textElement.selectionStart || 0)
-        })
-        
-        // 键盘和鼠标事件也可能改变光标位置
-        inputElement.addEventListener('keyup', () => {
-          const textElement = inputElement as HTMLInputElement | HTMLTextAreaElement
-          handleCursorPosition(fieldName, textElement.selectionStart || 0)
-        })
-        
-        inputElement.addEventListener('mouseup', () => {
-          const textElement = inputElement as HTMLInputElement | HTMLTextAreaElement
-          handleCursorPosition(fieldName, textElement.selectionStart || 0)
-        })
-      }
-    })
-  })
 }
 
 /**
  * 获取字段显示名称映射
  */
-const getFieldDisplayNames = (): Record<string, string> => {
-  const displayNames: Record<string, string> = {}
-  
-  if (detailForm.value.rule && Array.isArray(detailForm.value.rule)) {
-    detailForm.value.rule.forEach((rule: any) => {
-      if (rule.field && rule.title) {
-        displayNames[rule.field] = rule.title
-      }
-    })
-  }
-  
-  return displayNames
-}
 
-/**
- * 获取流程相关用户列表
- */
-const getProcessUsers = async (): Promise<number[]> => {
-  try {
-    const taskList = await TaskApi.getRunningTaskList(props.id)
-    const userIds = taskList.map((task: any) => task.assigneeUserId).filter(Boolean)
-    
-    // 去重并添加当前用户
-    const uniqueUserIds = Array.from(new Set([...userIds, currentUser.id]))
-    
-    console.log('流程相关用户列表:', uniqueUserIds)
-    return uniqueUserIds
-  } catch (error) {
-    console.error('获取流程用户列表失败:', error)
-    return [currentUser.id]
-  }
-}
 
 /**
  * 设置协同编辑消息监听器
  */
-const setupCollaborationMessageListeners = () => {
-  console.log('设置协同编辑消息监听器')
-  
-  // 监听 WebSocket 消息
-  onMessage((message) => {
-    try {
-      // 检查是否是表单协同编辑相关消息
-      if (isFormCollaborationMessage(message.type)) {
-        console.log('收到协同编辑消息:', message)
-        handleRemoteMessage(message)
-      }
-    } catch (error) {
-      console.error('处理协同编辑消息失败:', error)
-    }
-  })
-  
-  // 监听广播消息
-  onBroadcast((message) => {
-    try {
-      // 检查是否是表单协同编辑相关消息
-      if (isFormCollaborationMessage(message.type)) {
-        console.log('收到协同编辑广播消息:', message)
-        handleRemoteMessage(message)
-      }
-    } catch (error) {
-      console.error('处理协同编辑广播消息失败:', error)
-    }
-  })
-}
-
-/**
- * 检查是否是表单协同编辑消息
- */
-const isFormCollaborationMessage = (messageType: string): boolean => {
-  return Object.values(FormCollaborationMessageType).includes(messageType as FormCollaborationMessageType)
-}
 
 // ========== 生命周期钩子 ==========
 
@@ -1314,7 +1166,6 @@ onMounted(async () => {
   await ensureConnection()
   
   // 设置协同编辑消息监听
-  setupCollaborationMessageListeners()
   
   // 获取详情数据
   await getDetail()
@@ -1327,7 +1178,6 @@ onUnmounted(() => {
   console.log('流程实例详情页面卸载，清理协同编辑功能')
   
   // 清理协同编辑功能
-  cleanupCollaboration()
 })
 
 </script>
