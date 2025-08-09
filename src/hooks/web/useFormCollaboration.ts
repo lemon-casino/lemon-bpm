@@ -1,4 +1,4 @@
-import { ref, reactive, watch, nextTick, onUnmounted, readonly } from 'vue'
+import { ref, reactive, watch, nextTick, onUnmounted, readonly, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import * as TaskApi from '@/api/bpm/task'
 import { FormCollaborationMessageType, useWebSocketMessage } from './useWebSocketMessage'
@@ -79,15 +79,22 @@ export const useFormCollaboration = (config: FormCollaborationConfig) => {
   const currentEditingField = ref<string | null>(null)
   const isCollaborationEnabled = ref(true)
   
-  // 在线检测相关
-  const onlineCheckRequests = ref<Map<string, {
-    userId: number, 
-    timestamp: number, 
-    randomNumber: string, 
-    processInstanceId: string,
-    batchId?: string
-  }>>(new Map())
+  // 在线检测相关（链式检测）
   const confirmedOnlineUsers = ref<Set<number>>(new Set())
+  // 当前在线检测链的发起者
+  const chainInitiatorId = ref<number | null>(null)
+  // 记录已确认在线的用户链
+  const onlineChain = ref<number[]>([])
+  // 是否正在进行在线检测
+  const chainStarted = ref(false)
+  // 正在等待响应的用户
+  const pendingResponseUserId = ref<number | null>(null)
+  let pendingResponseTimer: NodeJS.Timeout | null = null
+  let chainStartTimer: NodeJS.Timeout | null = null
+  // 计算排序后的流程用户ID列表
+  const sortedUserIds = computed(() =>
+    processUsers.value.map((u: any) => u.id).sort((a: number, b: number) => a - b)
+  )
   
   /**
    * 获取流程相关用户列表
@@ -430,286 +437,176 @@ export const useFormCollaboration = (config: FormCollaborationConfig) => {
   }
   
   /**
-   * 发送在线检测请求
+   * 发送在线检测请求（链式检测入口）
    */
-  const sendOnlineCheckRequest = async (force = false) => {
+  const sendOnlineCheckRequest = (force = false) => {
     if (!isCollaborationEnabled.value) return
-    
-    // 检查是否有其他用户，如果只有自己则不发送检测请求
+
+    // 只有存在其他用户时才进行检测
     if (processUsers.value.length <= 1) {
-      console.log('🔍 跳过在线检测：当前流程只有自己一个用户')
+      confirmedOnlineUsers.value = new Set([currentUser.id])
       return
     }
-    
+
     const now = Date.now()
     const timeSinceLastCheck = now - lastOnlineCheckTime
-    
-    // 增强智能调度：20秒内不重复检测（除非强制），减少服务端压力
     if (!force && timeSinceLastCheck < 20000) {
       if (!pendingOnlineCheck) {
         pendingOnlineCheck = true
-        // 延迟到合适的时间再执行
         const delay = 20000 - timeSinceLastCheck
         onlineCheckTimer = setTimeout(() => {
           pendingOnlineCheck = false
           sendOnlineCheckRequest(true)
         }, delay)
-        console.log(`🔍 在线检测智能调度：将在 ${Math.ceil(delay/1000)} 秒后执行 (减少服务端压力)`)
       }
       return
     }
-    
-    // 清除待处理的检测
+
     if (onlineCheckTimer) {
       clearTimeout(onlineCheckTimer)
       onlineCheckTimer = null
       pendingOnlineCheck = false
     }
-    
-    console.log('🔍 发送在线检测请求给所有流程用户')
-    console.log(`📋 当前流程实例ID: ${processInstanceId}`)
-    console.log(`👤 当前用户ID: ${currentUser.id} (${currentUser.nickname})`)
-    
-    // 生成批次ID用于跟踪这次检测（使用连字符避免与checkId分隔符冲突）
-    const batchId = `${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 6)}`
-    const currentBatchUsers = new Set<number>()
-    let successCount = 0
-    let failedCount = 0
-    
-    console.log(`🎯 流程相关用户总数: ${processUsers.value.length}`)
-    console.log(`📊 当前确认在线用户数: ${confirmedOnlineUsers.value.size}`)
-    
-    // 向所有流程相关用户发送在线检测请求
-    for (const user of processUsers.value) {
-      if (user.id !== currentUser.id) {
-        try {
-          // 修复：生成唯一的检测ID格式：发起者ID_目标用户ID_批次ID_流程实例ID
-          const checkId = `${currentUser.id}_${user.id}_${batchId}_${processInstanceId}`
-          
-          // 记录检测请求
-          onlineCheckRequests.value.set(checkId, {
-            userId: user.id,
-            timestamp: now,
-            randomNumber: batchId,
-            processInstanceId,
-            batchId
-          })
-          
-          currentBatchUsers.add(user.id)
-          
-          const checkRequest = {
-            type: FormCollaborationMessageType.ONLINE_CHECK_REQUEST,
-            data: {
-              checkId,
-              fromUserId: currentUser.id,
-              fromUserNickname: currentUser.nickname,
-              targetUserId: user.id, // 明确指定目标用户ID
-              processInstanceId,
-              batchId,
-              userId: currentUser.id,
-              userNickname: currentUser.nickname,
-              userAvatar: currentUser.avatar,
-              timestamp: now
-            }
-          }
-          
-          // 直接向目标用户发送消息，增加重试机制
-          const sendSuccess = await wsSendMessage(user.id, checkRequest)
-          if (sendSuccess) {
-            successCount++
-            console.log(`📤 发送在线检测请求成功: ${checkId} -> 用户${user.id}`)
-          } else {
-            failedCount++
-            // 发送失败时立即标记用户为离线
-            confirmedOnlineUsers.value.delete(user.id)
-            console.log(`❌ 发送在线检测请求失败: 用户${user.id}`)
-          }
-        } catch (error) {
-          console.error(`❌ 向用户 ${user.id} 发送在线检测请求失败:`, error)
-          failedCount++
-          // 发送失败时立即标记用户为离线
-          confirmedOnlineUsers.value.delete(user.id)
-        }
-      }
-    }
-    
+
     lastOnlineCheckTime = now
-    console.log(`📊 在线检测请求发送完成: 成功 ${successCount} 个, 失败 ${failedCount} 个 (批次: ${batchId})`)
-    console.log(`⏰ 设置8秒超时处理 (批次: ${batchId})`)
-    
-    // 设置超时处理，8秒后处理未响应的用户（适当延长超时时间）
-    setTimeout(() => {
-      handleOnlineCheckTimeout(batchId, currentBatchUsers)
-    }, 8000)
+
+    // 最小用户ID优先发起检测
+    const smallestId = sortedUserIds.value[0]
+    if (currentUser.id === smallestId) {
+      startOnlineCheckChain()
+    } else {
+      if (chainStartTimer) clearTimeout(chainStartTimer)
+      chainStartTimer = setTimeout(() => {
+        if (!chainStarted.value) {
+          startOnlineCheckChain()
+        }
+      }, 5000)
+    }
   }
-  
-  /**
-   * 处理在线检测超时
-   */
-  const handleOnlineCheckTimeout = (batchId: string, expectedUsers: Set<number>) => {
-    const now = Date.now()
-    const expiredUsers = new Set<number>()
-    let timeoutCount = 0
-    
-    // 检查本批次的超时请求
-    for (const [checkId, request] of onlineCheckRequests.value.entries()) {
-      if (request.batchId === batchId && now - request.timestamp > 8000) {
-        expiredUsers.add(request.userId)
-        onlineCheckRequests.value.delete(checkId)
-        timeoutCount++
+
+  // 启动链式在线检测
+  const startOnlineCheckChain = () => {
+    chainStarted.value = true
+    chainInitiatorId.value = currentUser.id
+    onlineChain.value = [currentUser.id]
+    confirmedOnlineUsers.value.clear()
+    contactNextUser()
+  }
+
+  // 联系下一个用户
+  const contactNextUser = () => {
+    const visited = new Set(onlineChain.value)
+    const ids = sortedUserIds.value
+    let idx = ids.indexOf(currentUser.id)
+    let target: number | null = null
+    for (let i = 1; i < ids.length; i++) {
+      const candidate = ids[(idx + i) % ids.length]
+      if (!visited.has(candidate)) {
+        target = candidate
+        break
       }
     }
-    
-    // 批量更新超时用户状态
-    if (expiredUsers.size > 0) {
-      for (const userId of expiredUsers) {
-        // 从确认在线用户中移除
-        confirmedOnlineUsers.value.delete(userId)
-        
-        // 更新协作用户状态为离线
-        if (collaboratingUsers.value.has(userId)) {
-          const userStatus = collaboratingUsers.value.get(userId)!
-          collaboratingUsers.value.set(userId, {
-            ...userStatus,
-            isOnline: false,
-            lastOnlineTime: now
-          })
+
+    if (target != null && target !== chainInitiatorId.value) {
+      pendingResponseUserId.value = target
+      wsSendMessage(target, {
+        type: FormCollaborationMessageType.ONLINE_CHECK_REQUEST,
+        data: {
+          initiatorId: chainInitiatorId.value,
+          senderId: currentUser.id,
+          chain: onlineChain.value,
+          processInstanceId
         }
+      })
+      if (pendingResponseTimer) clearTimeout(pendingResponseTimer)
+      pendingResponseTimer = setTimeout(() => {
+        if (pendingResponseUserId.value === target) {
+          pendingResponseUserId.value = null
+          contactNextUser()
+        }
+      }, 3000)
+    } else {
+      if (currentUser.id === chainInitiatorId.value) {
+        confirmedOnlineUsers.value = new Set(onlineChain.value)
+        onlineChain.value.forEach(id => {
+          const info = processUsers.value.find((u: any) => u.id === id)
+          updateUserOnlineStatus(id, info?.nickname || '', info?.avatar || '', Date.now())
+        })
+        chainStarted.value = false
+        console.log('在线用户检测完成:', Array.from(confirmedOnlineUsers.value))
+      } else {
+        wsSendMessage(chainInitiatorId.value!, {
+          type: FormCollaborationMessageType.ONLINE_CHECK_RESPONSE,
+          data: {
+            initiatorId: chainInitiatorId.value,
+            responderId: currentUser.id,
+            chain: onlineChain.value,
+            processInstanceId
+          }
+        })
       }
-      console.log(`在线检测超时处理完成：${timeoutCount} 个用户超时 (批次: ${batchId})`)
     }
   }
 
   /**
-   * 处理在线检测请求（修复版）
+   * 处理在线检测请求（链式）
    */
   const handleOnlineCheckRequest = async (data: any) => {
-    console.log(`📥 收到在线检测请求:`, data)
-    
-    // 解析checkId：发起者ID_目标用户ID_批次ID_流程实例ID
-    const checkIdParts = data.checkId.split('_')
-    if (checkIdParts.length !== 4) {
-      console.error('❌ 无效的checkId格式:', data.checkId)
-      return
+    if (data.processInstanceId !== processInstanceId) return
+
+    chainStarted.value = true
+    if (chainStartTimer) {
+      clearTimeout(chainStartTimer)
+      chainStartTimer = null
     }
-    
-    const [fromUserId, targetUserId, batchId, requestProcessInstanceId] = checkIdParts
-    console.log(`🔍 解析checkId: 发起者${fromUserId} -> 目标${targetUserId}, 批次${batchId}, 流程${requestProcessInstanceId}`)
-    
-    // 验证目标用户ID是否为当前用户
-    if (parseInt(targetUserId) !== currentUser.id) {
-      console.log(`❌ 在线检测请求不是发给当前用户的: 目标用户${targetUserId}, 当前用户${currentUser.id}`)
-      return
-    }
-    
-    // 验证流程实例ID是否匹配当前页面
-    const isMatchingProcess = requestProcessInstanceId === processInstanceId
-    
-    if (!isMatchingProcess) {
-      console.log(`❌ 流程实例ID不匹配: 请求${requestProcessInstanceId}, 当前${processInstanceId}`)
-      return
-    }
-    
-    console.log(`✅ 在线检测请求验证通过，准备回复`)
-    
-    // 构造回复ID：发起者ID_响应者ID_批次ID_流程实例ID
-    const responseCheckId = `${fromUserId}_${currentUser.id}_${batchId}_${processInstanceId}`
-    
-    // 立即回复在线状态
-    const checkResponse = {
+
+    chainInitiatorId.value = data.initiatorId
+    const chainSet = new Set<number>(data.chain || [])
+    chainSet.add(currentUser.id)
+    onlineChain.value = Array.from(chainSet)
+
+    await wsSendMessage(data.senderId, {
       type: FormCollaborationMessageType.ONLINE_CHECK_RESPONSE,
       data: {
-        checkId: responseCheckId,
-        originalCheckId: data.checkId,
-        fromUserId: parseInt(fromUserId),
-        responseUserId: currentUser.id,
-        responseUserNickname: currentUser.nickname,
-        processInstanceId: processInstanceId,
-        isMatchingProcess: true,
-        batchId,
-        userId: currentUser.id,
-        userNickname: currentUser.nickname,
-        userAvatar: currentUser.avatar,
-        timestamp: Date.now()
+        initiatorId: data.initiatorId,
+        responderId: currentUser.id,
+        chain: onlineChain.value,
+        processInstanceId
       }
-    }
-    
-    console.log(`📤 准备发送在线检测响应:`, checkResponse)
-    
-    // 直接向请求发起者发送响应消息
-    const sendSuccess = await wsSendMessage(parseInt(fromUserId), checkResponse)
-    if (sendSuccess) {
-      console.log(`✅ 回复在线检测成功: ${responseCheckId} (批次: ${batchId})`)
-    } else {
-      console.log(`❌ 回复在线检测失败: ${responseCheckId} (批次: ${batchId})`)
-    }
+    })
+
+    contactNextUser()
   }
 
   /**
-   * 处理在线检测响应（修复版）
+   * 处理在线检测响应（链式）
    */
   const handleOnlineCheckResponse = (data: any) => {
-    console.log(`📥 收到在线检测响应:`, data)
-    console.log(`🔍 当前用户ID: ${currentUser.id}, 当前流程实例ID: ${processInstanceId}`)
-    
-    if (data.fromUserId !== currentUser.id) {
-      console.log(`❌ 响应不是发给当前用户的: 目标${data.fromUserId}, 当前${currentUser.id}`)
-      return // 只处理发给自己的响应
+    if (data.processInstanceId !== processInstanceId) return
+    if (data.initiatorId !== chainInitiatorId.value) return
+
+    const chainSet = new Set<number>(onlineChain.value)
+    ;(data.chain || []).forEach((id: number) => chainSet.add(id))
+    onlineChain.value = Array.from(chainSet)
+    const userInfo = processUsers.value.find((u: any) => u.id === data.responderId)
+    updateUserOnlineStatus(
+      data.responderId,
+      userInfo?.nickname || '',
+      userInfo?.avatar || '',
+      Date.now()
+    )
+
+    if (pendingResponseUserId.value === data.responderId) {
+      pendingResponseUserId.value = null
+      if (pendingResponseTimer) {
+        clearTimeout(pendingResponseTimer)
+        pendingResponseTimer = null
+      }
+      contactNextUser()
+    } else if (currentUser.id === chainInitiatorId.value) {
+      confirmedOnlineUsers.value = new Set(onlineChain.value)
+      chainStarted.value = false
     }
-    
-    // 快速验证流程实例ID
-    if (data.processInstanceId !== processInstanceId) {
-      console.log(`❌ 流程实例ID不匹配: 响应${data.processInstanceId}, 当前${processInstanceId}`)
-      return // 静默忽略不匹配的流程
-    }
-    
-    console.log(`✅ 流程实例ID匹配，证明用户${data.responseUserId}在相同流程实例下在线`)
-    
-    // 修复：解析新的响应ID格式：发起者ID_响应者ID_批次ID_流程实例ID
-    const checkIdParts = data.checkId.split('_')
-    if (checkIdParts.length !== 4) {
-      console.error('❌ 无效的响应checkId格式:', data.checkId)
-      return
-    }
-    
-    const [fromUserId, responseUserId, responseBatchId, responseProcessId] = checkIdParts
-    console.log(`🔍 解析响应checkId: 发起者${fromUserId}, 响应者${responseUserId}, 批次${responseBatchId}, 流程${responseProcessId}`)
-    
-    // 验证发起者ID是否为当前用户
-    if (parseInt(fromUserId) !== currentUser.id) {
-      console.warn(`❌ 响应发起者ID不匹配: 期望 ${currentUser.id}, 收到 ${fromUserId}`)
-      return
-    }
-    
-    // 验证响应用户ID是否匹配
-    if (parseInt(responseUserId) !== data.responseUserId) {
-      console.warn(`❌ 响应用户ID不匹配: 期望 ${responseUserId}, 收到 ${data.responseUserId}`)
-      return
-    }
-    
-    // 查找并移除对应的原始请求：发起者ID_目标用户ID_批次ID_流程实例ID
-    const originalCheckId = `${currentUser.id}_${data.responseUserId}_${responseBatchId}_${processInstanceId}`
-    console.log(`🔍 查找原始请求ID: ${originalCheckId}`)
-    console.log(`📋 当前待处理请求列表:`, Array.from(onlineCheckRequests.value.keys()))
-    
-    const foundRequest = onlineCheckRequests.value.get(originalCheckId)
-    
-    if (!foundRequest) {
-      console.log(`❌ 未找到对应的在线检测请求: ${originalCheckId}`)
-      console.log(`📊 当前确认在线用户数: ${confirmedOnlineUsers.value.size}`)
-      return
-    }
-    
-    console.log(`✅ 找到对应的原始请求:`, foundRequest)
-    
-    // 移除已处理的请求
-    onlineCheckRequests.value.delete(originalCheckId)
-    
-    // 更新用户在线状态
-    updateUserOnlineStatus(data.responseUserId, data.responseUserNickname, data.userAvatar || '', Date.now(), responseBatchId)
-    
-    console.log(`✅ 处理在线检测响应成功: 用户${data.responseUserId} (${data.responseUserNickname}) (批次: ${responseBatchId})`)
-    console.log(`📊 更新后确认在线用户数: ${confirmedOnlineUsers.value.size}`)
   }
   
   /**
@@ -1165,9 +1062,6 @@ export const useFormCollaboration = (config: FormCollaborationConfig) => {
       }
     }
     
-    // 清理在线检测请求
-    onlineCheckRequests.value.clear()
-    
     if (fullCleanup) {
       // 完全清理：组件卸载时使用
       lockedFields.value.clear()
@@ -1242,6 +1136,14 @@ export const useFormCollaboration = (config: FormCollaborationConfig) => {
     if (onlineCheckTimer) {
       clearTimeout(onlineCheckTimer)
       onlineCheckTimer = null
+    }
+    if (pendingResponseTimer) {
+      clearTimeout(pendingResponseTimer)
+      pendingResponseTimer = null
+    }
+    if (chainStartTimer) {
+      clearTimeout(chainStartTimer)
+      chainStartTimer = null
     }
     if (onlineNotificationTimer.current) {
       clearTimeout(onlineNotificationTimer.current)

@@ -337,6 +337,7 @@ const isAdmin = ref(false) // 是否为管理员
 // 表单协同编辑功能
 const userStore = useUserStore()
 const currentUser = userStore.getUser
+// 使用链式在线检测的协同编辑功能
 const {
   lockedFields,
   collaboratingUsers,

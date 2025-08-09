@@ -125,7 +125,7 @@ interface Props {
   showUserPanel?: boolean
   fieldDisplayNames?: Record<string, string>
   isRightLayout?: boolean // 是否为右侧布局
-  confirmedOnlineUsers?: Set<number> // 确认在线的用户ID集合
+  confirmedOnlineUsers?: Set<number> // 确认在线的用户ID集合，由链式检测得到
 }
 
 interface Emits {
