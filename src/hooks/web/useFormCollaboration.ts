@@ -71,7 +71,6 @@ export const useFormCollaboration = (config: Config) => {
       responseTimer = null
     }
   }
-
   const handleNoResponse = (targetId: number) => {
     pendingResponseUserId.value = null
     const next = nextUserId(targetId)
@@ -90,7 +89,7 @@ export const useFormCollaboration = (config: Config) => {
         chain: Array.from(confirmedOnlineUsers.value)
       } as OnlineCheckPayload
     }
-    sendMessage(targetId, message)
+    sendMessage(targetId, message, 'normal', processInstanceId)
     pendingResponseUserId.value = targetId
     if (responseTimer) clearTimeout(responseTimer)
     responseTimer = setTimeout(() => handleNoResponse(targetId), 3000)
@@ -129,22 +128,33 @@ export const useFormCollaboration = (config: Config) => {
   }
 
   const stopListener = onMessage((msg: any) => {
+    if (msg.id !== processInstanceId) return
     if (msg.type === FormCollaborationMessageType.ONLINE_CHECK_REQUEST) {
       const payload = msg.data as OnlineCheckPayload
       chainStarted.value = true
       chainInitiatorId.value = payload.initiator
       const updatedChain = [...payload.chain, currentUser.id]
       confirmedOnlineUsers.value = new Set(updatedChain)
-      sendMessage(msg.fromUserId, {
-        type: FormCollaborationMessageType.ONLINE_CHECK_RESPONSE,
-        data: { initiator: payload.initiator, chain: updatedChain } as OnlineCheckPayload
-      })
-      const next = nextUserId(currentUser.id)
-      if (next === payload.initiator) {
-        sendMessage(payload.initiator, {
+      sendMessage(
+        msg.fromUserId,
+        {
           type: FormCollaborationMessageType.ONLINE_CHECK_RESPONSE,
           data: { initiator: payload.initiator, chain: updatedChain } as OnlineCheckPayload
-        })
+        },
+        'normal',
+        processInstanceId
+      )
+      const next = nextUserId(currentUser.id)
+      if (next === payload.initiator) {
+        sendMessage(
+          payload.initiator,
+          {
+            type: FormCollaborationMessageType.ONLINE_CHECK_RESPONSE,
+            data: { initiator: payload.initiator, chain: updatedChain } as OnlineCheckPayload
+          },
+          'normal',
+          processInstanceId
+        )
       } else if (next != null) {
         sendCheck(next)
       }

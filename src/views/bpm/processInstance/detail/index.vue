@@ -57,6 +57,7 @@
             <div class="flex-shrink-0" style="margin-left: 20px">
               <FormCollaborationPanel
                 v-if="processDefinition?.formType === BpmModelFormType.NORMAL"
+                :key="props.id"
                 :process-users="processUsers"
                 :confirmed-online-users="confirmedOnlineUsers"
               />
