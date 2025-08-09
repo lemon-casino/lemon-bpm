@@ -15,6 +15,7 @@ export enum FormCollaborationMessageType {
   FORM_FIELD_CHANGE = 'FORM_FIELD_CHANGE',
   FORM_CURSOR_POSITION = 'FORM_CURSOR_POSITION',
   USER_EDITING_STATUS = 'USER_EDITING_STATUS',
+  // 链式在线检测请求与响应
   ONLINE_CHECK_REQUEST = 'ONLINE_CHECK_REQUEST',
   ONLINE_CHECK_RESPONSE = 'ONLINE_CHECK_RESPONSE',
   USER_OFFLINE = 'USER_OFFLINE',
@@ -316,7 +317,12 @@ export const useWebSocketMessage = () => {
    * @param priority 消息优先级（高优先级消息会优先发送）
    * @returns Promise<boolean> 返回发送是否成功
    */
-  const sendMessage = async (userId: number, message: any, priority: 'high' | 'normal' = 'normal'): Promise<boolean> => {
+  const sendMessage = async (
+    userId: number,
+    message: any,
+    priority: 'high' | 'normal' = 'normal',
+    messageId?: string
+  ): Promise<boolean> => {
     if (!userId || !message) {
       console.warn('发送消息失败：用户ID或消息内容为空')
       return false
@@ -327,7 +333,7 @@ export const useWebSocketMessage = () => {
       type: message.type,
       data: message.data || {},
       timestamp: Date.now(),
-      id: generateMessageId(),
+      id: messageId || generateMessageId(),
       fromUserId: userStore.getUser?.id || null
     }
 
