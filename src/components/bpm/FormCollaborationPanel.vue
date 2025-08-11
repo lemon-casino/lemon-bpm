@@ -37,13 +37,6 @@
           </div>
           <div class="user-info">
             <span class="user-name">{{ user.nickname }}</span>
-            <!-- 显示用户正在编辑的字段 -->
-            <div v-if="userEditingFields[user.id]" class="user-editing">
-              <span class="editing-label">正在编辑:</span>
-              <el-tag size="small" type="info" class="editing-field">
-                {{ userEditingFields[user.id] }}
-              </el-tag>
-            </div>
           </div>
           <div class="user-status">在线</div>
         </li>
@@ -57,14 +50,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { Close, Connection, UserFilled, ArrowUp, ArrowDown } from '@element-plus/icons-vue'
 
 interface Props {
   processUsers: any[]
   confirmedOnlineUsers: Set<number>
-  activeEditors?: Map<string, number>
-  fieldLabelMap?: Record<string, string>
 }
 
 const props = defineProps<Props>()
@@ -74,22 +65,6 @@ const emit = defineEmits(['update:visible'])
 const onlineUsers = computed(() =>
   props.processUsers.filter((u) => props.confirmedOnlineUsers.has(u.id))
 )
-
-// 计算用户正在编辑的字段
-const userEditingFields = computed(() => {
-  if (!props.activeEditors || !props.fieldLabelMap) return {}
-  
-  const result: Record<number, string> = {}
-  
-  // 遍历所有正在编辑的字段
-  props.activeEditors.forEach((userId, fieldName) => {
-    // 获取字段显示名称
-    const fieldLabel = props.fieldLabelMap?.[fieldName] || fieldName
-    result[userId] = fieldLabel
-  })
-  
-  return result
-})
 
 // 面板可见性
 const isVisible = ref(false)
@@ -350,25 +325,6 @@ defineExpose({
   overflow: hidden;
   text-overflow: ellipsis;
   color: #303133;
-}
-
-.user-editing {
-  display: flex;
-  align-items: center;
-  margin-top: 4px;
-  font-size: 12px;
-}
-
-.editing-label {
-  color: #909399;
-  margin-right: 4px;
-}
-
-.editing-field {
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .user-status {

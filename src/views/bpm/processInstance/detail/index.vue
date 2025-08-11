@@ -303,7 +303,6 @@ import { Share, Link, Plus, User } from '@element-plus/icons-vue'
 import { ContentWrap } from '@/components/ContentWrap'
 import { useUserStore } from '@/store/modules/user'
 import * as TaskApi from '@/api/bpm/task'
-import { FormCollaborationMessageType } from '@/hooks/web/useWebSocketMessage'
 
 defineOptions({ name: 'BpmProcessInstanceDetail' })
 const props = defineProps<{
@@ -345,7 +344,7 @@ const isAdmin = ref(false) // 是否为管理员
 // 在线用户检测
 const userStore = useUserStore()
 const currentUser = userStore.getUser
-const { processUsers, confirmedOnlineUsers, initCollaboration, sendFormFieldChange, activeEditors, fieldValues, lastFieldUpdate } = useFormCollaboration({
+const { processUsers, confirmedOnlineUsers, initCollaboration } = useFormCollaboration({
   processInstanceId: props.id,
   currentUser
 })
@@ -354,11 +353,6 @@ const { processUsers, confirmedOnlineUsers, initCollaboration, sendFormFieldChan
 const collaborationPanelRef = ref(null)
 // 审批详情区域引用
 const formScrollAreaRef = ref(null)
-
-// 当前正在编辑的字段
-const currentEditingField = ref<string | null>(null)
-// 表单字段显示名称映射
-const fieldLabelMap = ref<Record<string, string>>({})
 
 /**
  * 显示在线协作面板
@@ -1219,104 +1213,17 @@ const onFormMounted = () => {
   // 初始化在线检测
   if (processDefinition.value?.formType === BpmModelFormType.NORMAL) {
     initCollaboration()
-    setupFormSyncListeners()
   }
 }
 
 /**
  * 获取字段显示名称映射
  */
-const buildFieldLabelMap = () => {
-  if (!fApi.value || !detailForm.value.rule) return
-  
-  const map: Record<string, string> = {}
-  
-  detailForm.value.rule.forEach(rule => {
-    if (rule.field && rule.title) {
-      map[rule.field] = rule.title
-    }
-  })
-  
-  fieldLabelMap.value = map
-  console.log('字段名称映射:', fieldLabelMap.value)
-}
+
 
 /**
- * 设置表单同步监听器
+ * 设置协同编辑消息监听器
  */
-const setupFormSyncListeners = () => {
-  if (!fApi.value) {
-    console.warn('表单API未初始化，无法设置表单同步监听器')
-    return
-  }
-  
-  // 构建字段名称映射
-  buildFieldLabelMap()
-  
-  // 监听表单字段变化
-  fApi.value.$on('change', ({ value, field, formData }) => {
-    if (!field) return
-    
-    // 如果是当前用户正在编辑的字段，发送变更
-    if (currentEditingField.value === field) {
-      console.log(`字段 ${field} 值变更为:`, value)
-      
-      // 发送表单字段变更消息
-      sendFormFieldChange(
-        field, 
-        value, 
-        currentUser.nickname || `用户${currentUser.id}`
-      )
-    }
-  })
-  
-  // 监听表单字段获取焦点
-  fApi.value.$on('focus', ({ field }) => {
-    if (!field) return
-    
-    console.log(`字段 ${field} 获得焦点`)
-    currentEditingField.value = field
-  })
-  
-  // 监听表单字段失去焦点
-  fApi.value.$on('blur', ({ field }) => {
-    if (!field || currentEditingField.value !== field) return
-    
-    console.log(`字段 ${field} 失去焦点`)
-    currentEditingField.value = null
-  })
-  
-  // 监听其他用户的表单变更
-  watch(() => fieldValues.value, (newValues) => {
-    if (!fApi.value) return
-    
-    // 遍历所有字段变更
-    newValues.forEach((value, field) => {
-      // 如果不是当前用户正在编辑的字段，则更新表单值
-      if (currentEditingField.value !== field) {
-        const editor = activeEditors.value.get(field)
-        if (editor && editor !== currentUser.id) {
-          console.log(`更新字段 ${field} 的值，来自用户ID: ${editor}`)
-          
-          // 查找编辑用户信息
-          const editorUser = processUsers.value.find(u => u.id === editor)
-          const editorName = editorUser ? editorUser.nickname : `用户${editor}`
-          
-          // 获取字段显示名称
-          const fieldLabel = fieldLabelMap.value[field] || field
-          
-          // 显示提示消息
-          ElMessage.info(`${editorName} 修改了 ${fieldLabel} 字段`)
-          
-          // 更新表单值
-          const formData = { ...fApi.value.formData() }
-          formData[field] = value
-          fApi.value.setValue(formData)
-        }
-      }
-    })
-  }, { deep: true })
-}
 
 // ========== 生命周期钩子 ==========
 
