@@ -73,6 +73,8 @@
                 :process-users="processUsers"
                 :key="props.id"
                 :confirmed-online-users="confirmedOnlineUsers"
+                :active-editors="activeEditors"
+                :field-label-map="fieldLabelMap"
                 ref="collaborationPanelRef"
               />
             </div>
@@ -1287,35 +1289,47 @@ const setupFormSyncListeners = () => {
   })
   
   // 监听其他用户的表单变更
-  watch(() => fieldValues.value, (newValues) => {
-    if (!fApi.value) return
-    
-    // 遍历所有字段变更
-    newValues.forEach((value, field) => {
-      // 如果不是当前用户正在编辑的字段，则更新表单值
-      if (currentEditingField.value !== field) {
+  watch(
+    () => fieldValues.value,
+    (newValues) => {
+      if (!fApi.value) return
+
+      // 遍历所有字段变更
+      newValues.forEach((value, field) => {
         const editor = activeEditors.value.get(field)
+
+        // 根据编辑者设置字段的可编辑状态
         if (editor && editor !== currentUser.id) {
+          //@ts-ignore
+          fApi.value?.disabled(true, field)
+        } else {
+          //@ts-ignore
+          fApi.value?.disabled(false, field)
+        }
+
+        // 如果不是当前用户正在编辑的字段，则更新表单值
+        if (currentEditingField.value !== field && editor && editor !== currentUser.id) {
           console.log(`更新字段 ${field} 的值，来自用户ID: ${editor}`)
-          
+
           // 查找编辑用户信息
-          const editorUser = processUsers.value.find(u => u.id === editor)
+          const editorUser = processUsers.value.find((u) => u.id === editor)
           const editorName = editorUser ? editorUser.nickname : `用户${editor}`
-          
+
           // 获取字段显示名称
           const fieldLabel = fieldLabelMap.value[field] || field
-          
+
           // 显示提示消息
           ElMessage.info(`${editorName} 修改了 ${fieldLabel} 字段`)
-          
+
           // 更新表单值
           const formData = { ...fApi.value.formData() }
           formData[field] = value
           fApi.value.setValue(formData)
         }
-      }
-    })
-  }, { deep: true })
+      })
+    },
+    { deep: true }
+  )
 }
 
 // ========== 生命周期钩子 ==========

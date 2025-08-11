@@ -173,6 +173,7 @@ export const useFormCollaboration = (config: Config) => {
           type: FormCollaborationMessageType.FORM_FIELD_CHANGE,
           data: fieldChangeData
         }
+        // 使用流程实例ID作为消息前缀，确保接收方能够正确识别
         sendMessage(userId, message, 'high', `${processInstanceId}_field_${fieldName}`)
         console.log(`发送表单字段 ${fieldName} 变更到用户 ${userId}`)
       }
@@ -181,7 +182,8 @@ export const useFormCollaboration = (config: Config) => {
 
   // 监听消息
   const stopListener = onMessage((msg: any) => {
-    if (msg.id !== processInstanceId) return
+    // 只处理当前流程实例相关的消息
+    if (!msg.id || !msg.id.startsWith(processInstanceId)) return
     
     // 处理在线检测消息
     if (msg.type === FormCollaborationMessageType.ONLINE_CHECK_REQUEST) {
