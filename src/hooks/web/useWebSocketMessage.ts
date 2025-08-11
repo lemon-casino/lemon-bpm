@@ -22,6 +22,16 @@ export enum FormCollaborationMessageType {
   USER_ONLINE = 'USER_ONLINE'
 }
 
+// 定义消息内容接口
+export interface MessageContent {
+  type?: string;
+  fromUserId?: number;
+  text?: string;
+  data?: any;
+  timestamp?: number;
+  [key: string]: any;
+}
+
 export const useWebSocketMessage = () => {
   // 初始化用户store
   const userStore = useUserStore()
@@ -363,7 +373,7 @@ export const useWebSocketMessage = () => {
         monitorServerResponse('demo-message-send', userId)
         
         return true
-      } catch (error) {
+      } catch (error: any) {
         console.error(`❌ 发送demo-message-send失败，加入队列:`, error)
         
         // 更新发送统计
@@ -456,7 +466,7 @@ export const useWebSocketMessage = () => {
           if (parsedData.type === 'demo-message-receive') {
             console.log('📥 收到demo-message-receive消息')
             
-            let messageContent = null
+            let messageContent: MessageContent = {} as MessageContent
             
             // 检查是否有content字段（新格式）
             if (parsedData.content) {
@@ -475,19 +485,19 @@ export const useWebSocketMessage = () => {
                     messageContent = {
                       ...contentData,
                       ...textData  // 将text中的内容合并到消息中
-                    }
+                    } as MessageContent
                     console.log('✅ text字段JSON解析成功')
                   } catch (textParseError) {
                     console.log('📦 text字段不是JSON格式，保持原样')
-                    messageContent = contentData
+                    messageContent = contentData as MessageContent
                   }
                 } else {
-                  messageContent = contentData
+                  messageContent = contentData as MessageContent
                 }
               } catch (contentParseError) {
                 console.error('❌ 解析content字段失败:', contentParseError)
                 console.error('❌ content内容:', parsedData.content)
-                messageContent = parsedData
+                messageContent = parsedData as MessageContent
               }
             }
             // 检查是否有text字段（旧格式，直接JSON消息内容）
@@ -495,28 +505,26 @@ export const useWebSocketMessage = () => {
               console.log('📦 解析text字段中的JSON消息')
               try {
                 // 直接解析JSON，不解压缩
-                messageContent = JSON.parse(parsedData.text)
+                messageContent = JSON.parse(parsedData.text) as MessageContent
                 console.log('✅ text字段JSON解析成功:', messageContent.type)
               } catch (parseError) {
                 console.error('❌ 解析text字段JSON失败:', parseError)
                 console.error('❌ text内容:', parsedData.text)
-                messageContent = parsedData
+                messageContent = parsedData as MessageContent
               }
             } else {
               console.warn('⚠️ demo-message-receive消息缺少content和text字段')
-              messageContent = parsedData
+              messageContent = parsedData as MessageContent
             }
             
-            if (messageContent) {
-              console.log('📋 最终处理的消息:', {
-                type: messageContent.type || 'demo-message-receive',
-                fromUserId: messageContent.fromUserId,
-                text: messageContent.text,
-                data: messageContent.data,
-                timestamp: messageContent.timestamp
-              })
-              callback(messageContent)
-            }
+            console.log('📋 最终处理的消息:', {
+              type: messageContent.type || 'demo-message-receive',
+              fromUserId: messageContent.fromUserId,
+              text: messageContent.text,
+              data: messageContent.data,
+              timestamp: messageContent.timestamp
+            })
+            callback(messageContent)
           } else if ('type' in parsedData) {
             // 兼容处理其他类型的消息
             console.log('✅ 收到其他业务消息，类型:', parsedData.type)
@@ -542,7 +550,7 @@ export const useWebSocketMessage = () => {
           console.warn('⚠️ 收到非对象类型消息:', parsedData)
           callback(parsedData)
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('❌ 处理WebSocket消息错误:', error)
         console.error('❌ 错误详情:', {
           message: error.message,

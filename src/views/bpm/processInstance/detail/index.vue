@@ -53,13 +53,27 @@
               <el-icon class="mr-5px"><Link /></el-icon>
               <span>在浏览器打开</span>
             </el-button>
+            
+            <!-- 在线协作按钮 -->
+            <el-button
+              type="primary"
+              link
+              class="collaboration-button"
+              title="查看在线协作用户"
+              @click="showCollaborationPanel"
+            >
+              <el-icon class="mr-5px"><User /></el-icon>
+              <span>在线协作 ({{ confirmedOnlineUsers.size }})</span>
+            </el-button>
+            
             <!-- 在线用户面板 -->
-            <div class="flex-shrink-0" style="margin-left: 20px">
+            <div class="online-users-container">
               <FormCollaborationPanel
                 v-if="processDefinition?.formType === BpmModelFormType.NORMAL"
-                :key="props.id"
                 :process-users="processUsers"
+                :key="props.id"
                 :confirmed-online-users="confirmedOnlineUsers"
+                ref="collaborationPanelRef"
               />
             </div>
           </div>
@@ -89,8 +103,8 @@
 
         <el-tabs v-model="activeTab" class="process-tabs">
           <!-- 表单信息 -->
-          <el-tab-pane label="审批详情" name="form">
-            <div class="form-scroll-area">
+          <el-tab-pane label="审批详情" name="form" ref="formTabPaneRef">
+            <div class="form-scroll-area" ref="formScrollAreaRef">
               <el-scrollbar>
                 <el-row :gutter="10">
                   <!-- 表单信息 - 响应式布局：在小屏幕下占满宽度 -->
@@ -285,10 +299,11 @@ import { useWebSocketMessage } from '@/hooks/web/useWebSocketMessage'
 import { useFormCollaboration } from '@/hooks/web/useFormCollaboration'
 import FormCollaborationPanel from '@/components/bpm/FormCollaborationPanel.vue'
 import { ElMessage } from 'element-plus'
-import { Share, Link, Plus } from '@element-plus/icons-vue'
+import { Share, Link, Plus, User } from '@element-plus/icons-vue'
 import { ContentWrap } from '@/components/ContentWrap'
 import { useUserStore } from '@/store/modules/user'
 import * as TaskApi from '@/api/bpm/task'
+import { FormCollaborationMessageType } from '@/hooks/web/useWebSocketMessage'
 
 defineOptions({ name: 'BpmProcessInstanceDetail' })
 const props = defineProps<{
@@ -330,9 +345,67 @@ const isAdmin = ref(false) // 是否为管理员
 // 在线用户检测
 const userStore = useUserStore()
 const currentUser = userStore.getUser
-const { processUsers, confirmedOnlineUsers, initCollaboration } = useFormCollaboration({
+const { processUsers, confirmedOnlineUsers, initCollaboration, sendFormFieldChange, activeEditors, fieldValues, lastFieldUpdate } = useFormCollaboration({
   processInstanceId: props.id,
   currentUser
+})
+
+// 协作面板引用
+const collaborationPanelRef = ref(null)
+// 审批详情区域引用
+const formScrollAreaRef = ref(null)
+
+// 当前正在编辑的字段
+const currentEditingField = ref<string | null>(null)
+// 表单字段显示名称映射
+const fieldLabelMap = ref<Record<string, string>>({})
+
+/**
+ * 显示在线协作面板
+ */
+const showCollaborationPanel = () => {
+  if (collaborationPanelRef.value) {
+    collaborationPanelRef.value.togglePanel()
+  } else {
+    ElMessage.warning('协作面板未加载')
+  }
+}
+
+/**
+ * 处理审批详情区域点击事件，点击面板外部时折叠面板
+ * 限制在审批详情标签页内，避免影响其他页面导航
+ */
+const handleFormAreaClick = (event: MouseEvent) => {
+  // 只在当前标签页为"审批详情"时处理点击事件
+  if (activeTab.value !== 'form') {
+    return
+  }
+  
+  if (collaborationPanelRef.value && !event.target.closest('.collaboration-button')) {
+    // 检查点击是否在协作面板内
+    const panelElement = collaborationPanelRef.value.$el
+    if (panelElement && !panelElement.contains(event.target)) {
+      // 点击在面板外部，折叠面板
+      collaborationPanelRef.value.collapsePanel()
+    }
+  }
+}
+
+// 添加和移除审批详情区域点击事件监听
+onMounted(() => {
+  // 等待DOM渲染完成后绑定事件
+  nextTick(() => {
+    if (formScrollAreaRef.value) {
+      formScrollAreaRef.value.addEventListener('click', handleFormAreaClick)
+    }
+  })
+})
+
+onUnmounted(() => {
+  // 清理事件监听器
+  if (formScrollAreaRef.value) {
+    formScrollAreaRef.value.removeEventListener('click', handleFormAreaClick)
+  }
 })
 
 /** 获得详情 */
@@ -400,13 +473,13 @@ const getApprovalDetail = async (isFromRefresh = false) => {
       message.success('已自动加载您的下一个待办任务')
       
       // 强制更新operationButton组件，确保它能获取新任务信息
-      nextTick(() => {
+      await nextTick(() => {
         if (operationButtonRef.value && data.todoTask) {
           console.log('更新操作按钮组件的任务信息')
           operationButtonRef.value.loadTodoTask(data.todoTask)
           //更新审核详情内容
           console.log('开始更新表单内容')
-          
+
           // 刷新表单内容
           if (processDefinition.value.formType === BpmModelFormType.NORMAL && fApi.value) {
             // 直接更新表单值
@@ -414,19 +487,19 @@ const getApprovalDetail = async (isFromRefresh = false) => {
             // 刷新表单
             fApi.value.refresh()
             console.log('表单内容已更新')
-            
+
             // 获取表单字段权限并重新设置
             const formFieldsPermission = data.formFieldsPermission
             if (formFieldsPermission) {
               // 清空可编辑字段列表
               writableFields.splice(0)
-              
+
               // 重置所有字段为只读
               fApi.value?.btn.show(false)
               fApi.value?.resetBtn.show(false)
               //@ts-ignore
               fApi.value?.disabled(true)
-              
+
               // 先将所有字段设为可见，解决字段隐藏后无法重新显示的问题
               if (detailForm.value.rule && detailForm.value.rule.length > 0) {
                 detailForm.value.rule.forEach(rule => {
@@ -436,7 +509,7 @@ const getApprovalDetail = async (isFromRefresh = false) => {
                   }
                 })
               }
-              
+
               // 设置字段权限
               if (isAdmin.value) {
                 enableAllFieldsForAdmin()
@@ -445,13 +518,13 @@ const getApprovalDetail = async (isFromRefresh = false) => {
                   setFieldPermission(item, formFieldsPermission[item])
                 })
               }
-              
+
               // 打印表单权限信息（刷新后）
               console.log('刷新后的表单权限信息:')
               printFormFieldsPermission(formFieldsPermission)
             }
           }
-          
+
           // 更新流程图
           console.log('开始更新流程图')
           getProcessModelView().then(() => {
@@ -1146,17 +1219,104 @@ const onFormMounted = () => {
   // 初始化在线检测
   if (processDefinition.value?.formType === BpmModelFormType.NORMAL) {
     initCollaboration()
+    setupFormSyncListeners()
   }
 }
 
 /**
  * 获取字段显示名称映射
  */
-
+const buildFieldLabelMap = () => {
+  if (!fApi.value || !detailForm.value.rule) return
+  
+  const map: Record<string, string> = {}
+  
+  detailForm.value.rule.forEach(rule => {
+    if (rule.field && rule.title) {
+      map[rule.field] = rule.title
+    }
+  })
+  
+  fieldLabelMap.value = map
+  console.log('字段名称映射:', fieldLabelMap.value)
+}
 
 /**
- * 设置协同编辑消息监听器
+ * 设置表单同步监听器
  */
+const setupFormSyncListeners = () => {
+  if (!fApi.value) {
+    console.warn('表单API未初始化，无法设置表单同步监听器')
+    return
+  }
+  
+  // 构建字段名称映射
+  buildFieldLabelMap()
+  
+  // 监听表单字段变化
+  fApi.value.$on('change', ({ value, field, formData }) => {
+    if (!field) return
+    
+    // 如果是当前用户正在编辑的字段，发送变更
+    if (currentEditingField.value === field) {
+      console.log(`字段 ${field} 值变更为:`, value)
+      
+      // 发送表单字段变更消息
+      sendFormFieldChange(
+        field, 
+        value, 
+        currentUser.nickname || `用户${currentUser.id}`
+      )
+    }
+  })
+  
+  // 监听表单字段获取焦点
+  fApi.value.$on('focus', ({ field }) => {
+    if (!field) return
+    
+    console.log(`字段 ${field} 获得焦点`)
+    currentEditingField.value = field
+  })
+  
+  // 监听表单字段失去焦点
+  fApi.value.$on('blur', ({ field }) => {
+    if (!field || currentEditingField.value !== field) return
+    
+    console.log(`字段 ${field} 失去焦点`)
+    currentEditingField.value = null
+  })
+  
+  // 监听其他用户的表单变更
+  watch(() => fieldValues.value, (newValues) => {
+    if (!fApi.value) return
+    
+    // 遍历所有字段变更
+    newValues.forEach((value, field) => {
+      // 如果不是当前用户正在编辑的字段，则更新表单值
+      if (currentEditingField.value !== field) {
+        const editor = activeEditors.value.get(field)
+        if (editor && editor !== currentUser.id) {
+          console.log(`更新字段 ${field} 的值，来自用户ID: ${editor}`)
+          
+          // 查找编辑用户信息
+          const editorUser = processUsers.value.find(u => u.id === editor)
+          const editorName = editorUser ? editorUser.nickname : `用户${editor}`
+          
+          // 获取字段显示名称
+          const fieldLabel = fieldLabelMap.value[field] || field
+          
+          // 显示提示消息
+          ElMessage.info(`${editorName} 修改了 ${fieldLabel} 字段`)
+          
+          // 更新表单值
+          const formData = { ...fApi.value.formData() }
+          formData[field] = value
+          fApi.value.setValue(formData)
+        }
+      }
+    })
+  }, { deep: true })
+}
 
 // ========== 生命周期钩子 ==========
 
@@ -1739,6 +1899,29 @@ $process-header-height: 194px;
   }
 }
 
+// 在线协作按钮样式
+.collaboration-button {
+  margin-left: 10px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  
+  @media (max-width: 767px) {
+    margin-left: 5px;
+  }
+  
+  @media (max-width: 575px) {
+    padding: 2px 5px;
+    font-size: 12px;
+  }
+  
+  @media (max-width: 450px) {
+    span {
+      display: none; // 在非常小的屏幕上只显示图标
+    }
+  }
+}
+
 // 评论区样式
 .comments-section {
   border-top: 1px solid var(--el-border-color-lighter);
@@ -1892,6 +2075,28 @@ $process-header-height: 194px;
       width: 50px !important;
       height: 50px !important;
     }
+  }
+}
+
+// 在线用户容器样式
+.online-users-container {
+  flex-shrink: 0;
+  margin-left: 15px;
+  display: flex;
+  align-items: center;
+  
+  /* 隐藏容器，面板会通过绝对定位显示 */
+  visibility: hidden;
+  height: 0;
+  width: 0;
+  overflow: hidden;
+  
+  @media (max-width: 767px) {
+    margin-left: 10px;
+  }
+  
+  @media (max-width: 575px) {
+    margin-left: 5px;
   }
 }
 </style>

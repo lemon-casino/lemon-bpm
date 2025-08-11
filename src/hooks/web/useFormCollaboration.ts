@@ -12,6 +12,18 @@ interface OnlineCheckPayload {
   chain: number[]
 }
 
+// 表单同步消息类型
+export const FORM_SYNC_MESSAGE_TYPE = 'demo-message-send'
+
+// 表单变更数据结构
+export interface FormFieldChangeData {
+  fieldName: string
+  fieldValue: any
+  userId: number
+  userName: string
+  timestamp: number
+}
+
 export const useFormCollaboration = (config: Config) => {
   const { processInstanceId, currentUser } = config
 
@@ -23,6 +35,11 @@ export const useFormCollaboration = (config: Config) => {
   const pendingResponseUserId = ref<number | null>(null)
   let responseTimer: NodeJS.Timeout | null = null
   let startTimer: NodeJS.Timeout | null = null
+
+  // 表单同步相关状态
+  const activeEditors = ref<Map<string, number>>(new Map()) // 字段名 -> 用户ID
+  const fieldValues = ref<Map<string, any>>(new Map()) // 字段名 -> 值
+  const lastFieldUpdate = ref<Map<string, number>>(new Map()) // 字段名 -> 时间戳
 
   const { sendMessage, onMessage } = useWebSocketMessage()
 
@@ -122,13 +139,51 @@ export const useFormCollaboration = (config: Config) => {
     }
   }
 
+  // 初始化协同编辑功能
   const initCollaboration = async () => {
     await getProcessUsers()
     scheduleStart()
   }
 
+  // 发送表单字段变更
+  const sendFormFieldChange = (fieldName: string, fieldValue: any, userName: string) => {
+    if (!confirmedOnlineUsers.value.size || confirmedOnlineUsers.value.size <= 1) {
+      console.log('没有其他在线用户，无需发送表单变更')
+      return
+    }
+
+    // 更新本地状态
+    activeEditors.value.set(fieldName, currentUser.id)
+    fieldValues.value.set(fieldName, fieldValue)
+    lastFieldUpdate.value.set(fieldName, Date.now())
+
+    // 构造表单变更消息
+    const fieldChangeData: FormFieldChangeData = {
+      fieldName,
+      fieldValue,
+      userId: currentUser.id,
+      userName,
+      timestamp: Date.now()
+    }
+
+    // 发送给所有在线用户
+    for (const userId of confirmedOnlineUsers.value) {
+      if (userId !== currentUser.id) {
+        const message = {
+          type: FormCollaborationMessageType.FORM_FIELD_CHANGE,
+          data: fieldChangeData
+        }
+        sendMessage(userId, message, 'high', `${processInstanceId}_field_${fieldName}`)
+        console.log(`发送表单字段 ${fieldName} 变更到用户 ${userId}`)
+      }
+    }
+  }
+
+  // 监听消息
   const stopListener = onMessage((msg: any) => {
     if (msg.id !== processInstanceId) return
+    
+    // 处理在线检测消息
     if (msg.type === FormCollaborationMessageType.ONLINE_CHECK_REQUEST) {
       const payload = msg.data as OnlineCheckPayload
       chainStarted.value = true
@@ -174,6 +229,16 @@ export const useFormCollaboration = (config: Config) => {
         if (responseTimer) clearTimeout(responseTimer)
         pendingResponseUserId.value = null
       }
+    } 
+    // 处理表单字段变更消息
+    else if (msg.type === FormCollaborationMessageType.FORM_FIELD_CHANGE) {
+      const fieldChange = msg.data as FormFieldChangeData
+      console.log(`收到表单字段 ${fieldChange.fieldName} 变更，来自用户 ${fieldChange.userName}`)
+      
+      // 更新本地状态
+      activeEditors.value.set(fieldChange.fieldName, fieldChange.userId)
+      fieldValues.value.set(fieldChange.fieldName, fieldChange.fieldValue)
+      lastFieldUpdate.value.set(fieldChange.fieldName, fieldChange.timestamp)
     }
   })
 
@@ -186,6 +251,11 @@ export const useFormCollaboration = (config: Config) => {
   return {
     processUsers,
     confirmedOnlineUsers,
-    initCollaboration
+    initCollaboration,
+    // 导出表单同步相关方法和状态
+    sendFormFieldChange,
+    activeEditors,
+    fieldValues,
+    lastFieldUpdate
   }
 }
