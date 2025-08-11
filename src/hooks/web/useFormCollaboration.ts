@@ -1,10 +1,11 @@
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed, onUnmounted, Ref } from 'vue'
 import * as TaskApi from '@/api/bpm/task'
 import { useWebSocketMessage, FormCollaborationMessageType } from './useWebSocketMessage'
 
 interface Config {
   processInstanceId: string
   currentUser: { id: number }
+  formApi?: Ref<any>
 }
 
 interface OnlineCheckPayload {
@@ -13,10 +14,23 @@ interface OnlineCheckPayload {
 }
 
 export const useFormCollaboration = (config: Config) => {
-  const { processInstanceId, currentUser } = config
+  const { processInstanceId, currentUser, formApi } = config
 
   const processUsers = ref<any[]>([])
   const confirmedOnlineUsers = ref<Set<number>>(new Set())
+
+  // 正在编辑的用户列表
+  const editingUsers = ref<Set<number>>(new Set())
+
+  // 标记是否正在应用远程变更，避免死循环
+  const isApplyingRemoteChange = ref(false)
+
+  // 协同编辑临时禁用字段的恢复定时器
+  const fieldRestoreTimers = new Map<string, NodeJS.Timeout>()
+  // 记录字段原始的禁用状态，避免恢复时覆盖原有权限
+  const fieldOriginalDisabled = new Map<string, boolean>()
+  // 表单字段变更广播的防抖定时器
+  const fieldBroadcastTimers = new Map<string, NodeJS.Timeout>()
 
   const chainStarted = ref(false)
   const chainInitiatorId = ref<number | null>(null)
@@ -24,7 +38,7 @@ export const useFormCollaboration = (config: Config) => {
   let responseTimer: NodeJS.Timeout | null = null
   let startTimer: NodeJS.Timeout | null = null
 
-  const { sendMessage, onMessage } = useWebSocketMessage()
+  const { sendMessage, onMessage, sendToUsers } = useWebSocketMessage()
 
   const sortedUserIds = computed(() =>
     processUsers.value.map((u: any) => u.id).sort((a: number, b: number) => a - b)
@@ -122,8 +136,44 @@ export const useFormCollaboration = (config: Config) => {
     }
   }
 
+  /**
+   * 广播表单字段变更
+   */
+  const broadcastFieldChange = (field: string, value: any) => {
+    // 标记当前用户正在编辑
+    editingUsers.value.add(currentUser.id)
+    setTimeout(() => editingUsers.value.delete(currentUser.id), 3000)
+    // 使用防抖，避免频繁发送消息
+    if (fieldBroadcastTimers.has(field)) {
+      clearTimeout(fieldBroadcastTimers.get(field)!)
+    }
+    fieldBroadcastTimers.set(
+      field,
+      setTimeout(() => {
+        const targets = Array.from(confirmedOnlineUsers.value).filter(
+          (id) => id !== currentUser.id
+        )
+        if (targets.length === 0) return
+        sendToUsers(
+          targets,
+          {
+            type: FormCollaborationMessageType.FORM_FIELD_CHANGE,
+            data: { field, value }
+          },
+          'high',
+          processInstanceId
+        )
+        fieldBroadcastTimers.delete(field)
+      }, 300)
+    )
+  }
+
   const initCollaboration = async () => {
     await getProcessUsers()
+    // 默认认为流程参与者都在线，避免初始状态显示数量不足
+    confirmedOnlineUsers.value = new Set(
+      processUsers.value.map((u: any) => u.id)
+    )
     scheduleStart()
   }
 
@@ -174,6 +224,45 @@ export const useFormCollaboration = (config: Config) => {
         if (responseTimer) clearTimeout(responseTimer)
         pendingResponseUserId.value = null
       }
+    } else if (msg.type === FormCollaborationMessageType.FORM_FIELD_CHANGE) {
+      const { field, value } = msg.data || {}
+      // 如果是自己发送的变更，直接忽略
+      if (!field || msg.fromUserId === currentUser.id) return
+
+      editingUsers.value.add(msg.fromUserId)
+      setTimeout(() => editingUsers.value.delete(msg.fromUserId), 3000)
+
+      if (formApi?.value) {
+        isApplyingRemoteChange.value = true
+        formApi.value.setValue(field, value)
+
+        // 记录原始禁用状态并暂时禁用字段
+        if (!fieldOriginalDisabled.has(field)) {
+          try {
+            const rule = formApi.value.getRule ? formApi.value.getRule(field) : null
+            fieldOriginalDisabled.set(field, rule?.props?.disabled ?? false)
+          } catch (e) {
+            fieldOriginalDisabled.set(field, false)
+          }
+        }
+        formApi.value.disabled(true, field)
+
+        // 若已有定时器则重置
+        if (fieldRestoreTimers.has(field)) {
+          clearTimeout(fieldRestoreTimers.get(field)!)
+        }
+        fieldRestoreTimers.set(
+          field,
+          setTimeout(() => {
+            const original = fieldOriginalDisabled.get(field) ?? false
+            formApi.value.disabled(original, field)
+            fieldRestoreTimers.delete(field)
+            fieldOriginalDisabled.delete(field)
+          }, 2000)
+        )
+
+        isApplyingRemoteChange.value = false
+      }
     }
   })
 
@@ -181,11 +270,16 @@ export const useFormCollaboration = (config: Config) => {
     stopListener()
     if (responseTimer) clearTimeout(responseTimer)
     if (startTimer) clearTimeout(startTimer)
+    fieldRestoreTimers.forEach((t) => clearTimeout(t))
+    fieldBroadcastTimers.forEach((t) => clearTimeout(t))
   })
 
   return {
     processUsers,
     confirmedOnlineUsers,
-    initCollaboration
+    initCollaboration,
+    broadcastFieldChange,
+    editingUsers,
+    isApplyingRemoteChange
   }
 }

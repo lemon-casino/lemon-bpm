@@ -410,6 +410,26 @@ export const useWebSocketMessage = () => {
     }
   }
 
+  /**
+   * 向多个用户发送消息
+   * @param userIds 目标用户ID数组
+   * @param message 消息内容
+   * @param priority 消息优先级
+   * @param messageId 自定义消息ID
+   */
+  const sendToUsers = async (
+    userIds: number[],
+    message: any,
+    priority: 'high' | 'normal' = 'normal',
+    messageId?: string
+  ): Promise<boolean> => {
+    if (!userIds || userIds.length === 0) return false
+    const results = await Promise.all(
+      userIds.map((id) => sendMessage(id, message, priority, messageId))
+    )
+    return results.every(Boolean)
+  }
+
   // 发送广播消息
   const sendBroadcast = (type: string, data?: any) => {
     try {
@@ -622,6 +642,7 @@ export const useWebSocketMessage = () => {
   return {
     send,
     sendMessage,
+    sendToUsers,
     sendBroadcast,
     onMessage,
     onBroadcast,
