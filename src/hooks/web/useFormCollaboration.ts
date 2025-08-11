@@ -25,6 +25,10 @@ export const useFormCollaboration = (config: Config) => {
   // 标记是否正在应用远程变更，避免死循环
   const isApplyingRemoteChange = ref(false)
 
+  // 协同编辑临时禁用字段的恢复定时器
+  const fieldRestoreTimers = new Map<string, NodeJS.Timeout>()
+  // 记录字段原始的禁用状态，避免恢复时覆盖原有权限
+  const fieldOriginalDisabled = new Map<string, boolean>()
   const chainStarted = ref(false)
   const chainInitiatorId = ref<number | null>(null)
   const pendingResponseUserId = ref<number | null>(null)
@@ -206,13 +210,41 @@ export const useFormCollaboration = (config: Config) => {
       }
     } else if (msg.type === FormCollaborationMessageType.FORM_FIELD_CHANGE) {
       const { field, value } = msg.data || {}
-      if (!field) return
+      // 如果是自己发送的变更，直接忽略
+      if (!field || msg.fromUserId === currentUser.id) return
+
       editingUsers.value.add(msg.fromUserId)
       setTimeout(() => editingUsers.value.delete(msg.fromUserId), 3000)
+
       if (formApi?.value) {
         isApplyingRemoteChange.value = true
         formApi.value.setValue(field, value)
+
+        // 记录原始禁用状态并暂时禁用字段
+        if (!fieldOriginalDisabled.has(field)) {
+          try {
+            const rule = formApi.value.getRule ? formApi.value.getRule(field) : null
+            fieldOriginalDisabled.set(field, rule?.props?.disabled ?? false)
+          } catch (e) {
+            fieldOriginalDisabled.set(field, false)
+          }
+        }
         formApi.value.disabled(true, field)
+
+        // 若已有定时器则重置
+        if (fieldRestoreTimers.has(field)) {
+          clearTimeout(fieldRestoreTimers.get(field)!)
+        }
+        fieldRestoreTimers.set(
+          field,
+          setTimeout(() => {
+            const original = fieldOriginalDisabled.get(field) ?? false
+            formApi.value.disabled(original, field)
+            fieldRestoreTimers.delete(field)
+            fieldOriginalDisabled.delete(field)
+          }, 2000)
+        )
+
         isApplyingRemoteChange.value = false
       }
     }
