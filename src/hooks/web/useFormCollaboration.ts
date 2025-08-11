@@ -29,7 +29,6 @@ export const useFormCollaboration = (config: Config) => {
   const fieldRestoreTimers = new Map<string, NodeJS.Timeout>()
   // 记录字段原始的禁用状态，避免恢复时覆盖原有权限
   const fieldOriginalDisabled = new Map<string, boolean>()
-
   const chainStarted = ref(false)
   const chainInitiatorId = ref<number | null>(null)
   const pendingResponseUserId = ref<number | null>(null)
