@@ -29,6 +29,9 @@ export const useFormCollaboration = (config: Config) => {
   const fieldRestoreTimers = new Map<string, NodeJS.Timeout>()
   // 记录字段原始的禁用状态，避免恢复时覆盖原有权限
   const fieldOriginalDisabled = new Map<string, boolean>()
+  // 表单字段变更广播的防抖定时器
+  const fieldBroadcastTimers = new Map<string, NodeJS.Timeout>()
+
   const chainStarted = ref(false)
   const chainInitiatorId = ref<number | null>(null)
   const pendingResponseUserId = ref<number | null>(null)
@@ -140,19 +143,28 @@ export const useFormCollaboration = (config: Config) => {
     // 标记当前用户正在编辑
     editingUsers.value.add(currentUser.id)
     setTimeout(() => editingUsers.value.delete(currentUser.id), 3000)
-
-    const targets = Array.from(confirmedOnlineUsers.value).filter(
-      (id) => id !== currentUser.id
-    )
-    if (targets.length === 0) return
-    sendToUsers(
-      targets,
-      {
-        type: FormCollaborationMessageType.FORM_FIELD_CHANGE,
-        data: { field, value }
-      },
-      'high',
-      processInstanceId
+    // 使用防抖，避免频繁发送消息
+    if (fieldBroadcastTimers.has(field)) {
+      clearTimeout(fieldBroadcastTimers.get(field)!)
+    }
+    fieldBroadcastTimers.set(
+      field,
+      setTimeout(() => {
+        const targets = Array.from(confirmedOnlineUsers.value).filter(
+          (id) => id !== currentUser.id
+        )
+        if (targets.length === 0) return
+        sendToUsers(
+          targets,
+          {
+            type: FormCollaborationMessageType.FORM_FIELD_CHANGE,
+            data: { field, value }
+          },
+          'high',
+          processInstanceId
+        )
+        fieldBroadcastTimers.delete(field)
+      }, 300)
     )
   }
 
@@ -254,6 +266,8 @@ export const useFormCollaboration = (config: Config) => {
     stopListener()
     if (responseTimer) clearTimeout(responseTimer)
     if (startTimer) clearTimeout(startTimer)
+    fieldRestoreTimers.forEach((t) => clearTimeout(t))
+    fieldBroadcastTimers.forEach((t) => clearTimeout(t))
   })
 
   return {
