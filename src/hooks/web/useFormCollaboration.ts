@@ -1,10 +1,11 @@
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed, onUnmounted, Ref } from 'vue'
 import * as TaskApi from '@/api/bpm/task'
 import { useWebSocketMessage, FormCollaborationMessageType } from './useWebSocketMessage'
 
 interface Config {
   processInstanceId: string
   currentUser: { id: number }
+  formApi?: Ref<any>
 }
 
 interface OnlineCheckPayload {
@@ -13,10 +14,16 @@ interface OnlineCheckPayload {
 }
 
 export const useFormCollaboration = (config: Config) => {
-  const { processInstanceId, currentUser } = config
+  const { processInstanceId, currentUser, formApi } = config
 
   const processUsers = ref<any[]>([])
   const confirmedOnlineUsers = ref<Set<number>>(new Set())
+
+  // 正在编辑的用户列表
+  const editingUsers = ref<Set<number>>(new Set())
+
+  // 标记是否正在应用远程变更，避免死循环
+  const isApplyingRemoteChange = ref(false)
 
   const chainStarted = ref(false)
   const chainInitiatorId = ref<number | null>(null)
@@ -24,7 +31,7 @@ export const useFormCollaboration = (config: Config) => {
   let responseTimer: NodeJS.Timeout | null = null
   let startTimer: NodeJS.Timeout | null = null
 
-  const { sendMessage, onMessage } = useWebSocketMessage()
+  const { sendMessage, onMessage, sendToUsers } = useWebSocketMessage()
 
   const sortedUserIds = computed(() =>
     processUsers.value.map((u: any) => u.id).sort((a: number, b: number) => a - b)
@@ -122,6 +129,29 @@ export const useFormCollaboration = (config: Config) => {
     }
   }
 
+  /**
+   * 广播表单字段变更
+   */
+  const broadcastFieldChange = (field: string, value: any) => {
+    // 标记当前用户正在编辑
+    editingUsers.value.add(currentUser.id)
+    setTimeout(() => editingUsers.value.delete(currentUser.id), 3000)
+
+    const targets = Array.from(confirmedOnlineUsers.value).filter(
+      (id) => id !== currentUser.id
+    )
+    if (targets.length === 0) return
+    sendToUsers(
+      targets,
+      {
+        type: FormCollaborationMessageType.FORM_FIELD_CHANGE,
+        data: { field, value }
+      },
+      'high',
+      processInstanceId
+    )
+  }
+
   const initCollaboration = async () => {
     await getProcessUsers()
     scheduleStart()
@@ -174,6 +204,17 @@ export const useFormCollaboration = (config: Config) => {
         if (responseTimer) clearTimeout(responseTimer)
         pendingResponseUserId.value = null
       }
+    } else if (msg.type === FormCollaborationMessageType.FORM_FIELD_CHANGE) {
+      const { field, value } = msg.data || {}
+      if (!field) return
+      editingUsers.value.add(msg.fromUserId)
+      setTimeout(() => editingUsers.value.delete(msg.fromUserId), 3000)
+      if (formApi?.value) {
+        isApplyingRemoteChange.value = true
+        formApi.value.setValue(field, value)
+        formApi.value.disabled(true, field)
+        isApplyingRemoteChange.value = false
+      }
     }
   })
 
@@ -186,6 +227,9 @@ export const useFormCollaboration = (config: Config) => {
   return {
     processUsers,
     confirmedOnlineUsers,
-    initCollaboration
+    initCollaboration,
+    broadcastFieldChange,
+    editingUsers,
+    isApplyingRemoteChange
   }
 }
