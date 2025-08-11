@@ -73,6 +73,7 @@
                 :process-users="processUsers"
                 :key="props.id"
                 :confirmed-online-users="confirmedOnlineUsers"
+                :editing-users="editingUsers"
                 ref="collaborationPanelRef"
               />
             </div>
@@ -344,9 +345,17 @@ const isAdmin = ref(false) // 是否为管理员
 // 在线用户检测
 const userStore = useUserStore()
 const currentUser = userStore.getUser
-const { processUsers, confirmedOnlineUsers, initCollaboration } = useFormCollaboration({
+const {
+  processUsers,
+  confirmedOnlineUsers,
+  initCollaboration,
+  broadcastFieldChange,
+  editingUsers,
+  isApplyingRemoteChange
+} = useFormCollaboration({
   processInstanceId: props.id,
-  currentUser
+  currentUser,
+  formApi: fApi
 })
 
 // 协作面板引用
@@ -1209,10 +1218,22 @@ const isHtmlContent = (content: string) => {
  */
 const onFormMounted = () => {
   console.log('表单挂载完成，初始化协同编辑功能')
-  
+
   // 初始化在线检测
   if (processDefinition.value?.formType === BpmModelFormType.NORMAL) {
     initCollaboration()
+    watch(
+      () => detailForm.value.value,
+      (newVal, oldVal) => {
+        if (!oldVal || isApplyingRemoteChange.value) return
+        for (const key in newVal) {
+          if (newVal[key] !== oldVal[key]) {
+            broadcastFieldChange(key, newVal[key])
+          }
+        }
+      },
+      { deep: true }
+    )
   }
 }
 

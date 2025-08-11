@@ -29,7 +29,12 @@
     <!-- 用户列表 -->
     <div class="user-list-container" v-show="!isCollapsed">
       <transition-group name="user-list" tag="ul" class="user-list" v-if="onlineUsers.length">
-        <li v-for="user in onlineUsers" :key="user.id" class="user-item" :class="{'highlighted': user.id % 2 === 0}">
+        <li
+          v-for="user in onlineUsers"
+          :key="user.id"
+          class="user-item"
+          :class="{ highlighted: user.id % 2 === 0 }"
+        >
           <div class="user-avatar">
             <el-avatar :size="36" v-if="user.avatar" :src="user.avatar" />
             <el-avatar :size="36" v-else>{{ user.nickname?.substring(0, 1) }}</el-avatar>
@@ -38,7 +43,9 @@
           <div class="user-info">
             <span class="user-name">{{ user.nickname }}</span>
           </div>
-          <div class="user-status">在线</div>
+          <div class="user-status">
+            {{ props.editingUsers.has(user.id) ? '编辑中' : '在线' }}
+          </div>
         </li>
       </transition-group>
       <div v-else class="empty-state">
@@ -56,6 +63,7 @@ import { Close, Connection, UserFilled, ArrowUp, ArrowDown } from '@element-plus
 interface Props {
   processUsers: any[]
   confirmedOnlineUsers: Set<number>
+  editingUsers: Set<number>
 }
 
 const props = defineProps<Props>()
