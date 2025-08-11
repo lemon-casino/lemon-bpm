@@ -170,6 +170,10 @@ export const useFormCollaboration = (config: Config) => {
 
   const initCollaboration = async () => {
     await getProcessUsers()
+    // 默认认为流程参与者都在线，避免初始状态显示数量不足
+    confirmedOnlineUsers.value = new Set(
+      processUsers.value.map((u: any) => u.id)
+    )
     scheduleStart()
   }
 
