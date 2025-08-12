@@ -213,16 +213,18 @@
             <div class="form-scroll-area">
               <!-- 流程图容器，直接使用组件，避免多余嵌套 -->
               <ProcessInstanceSimpleViewer
-                v-show="
-                  processDefinition.modelType && processDefinition.modelType === BpmModelType.SIMPLE
+                v-if="
+                  activeTab === 'diagram' &&
+                  processDefinition.modelType === BpmModelType.SIMPLE
                 "
                 :loading="processInstanceLoading"
                 :model-view="processModelView"
                 class="process-viewer-component"
               />
               <ProcessInstanceBpmnViewer
-                v-show="
-                  processDefinition.modelType && processDefinition.modelType === BpmModelType.BPMN
+                v-if="
+                  activeTab === 'diagram' &&
+                  processDefinition.modelType === BpmModelType.BPMN
                 "
                 :loading="processInstanceLoading"
                 :model-view="processModelView"

@@ -277,7 +277,7 @@ const fixSequenceFlowRefs = (xml: string): string => {
 
     const invalidIds: string[] = []
     const sequenceFlows = Array.from(
-      doc.getElementsByTagNameNS(BPMN_NS, 'SequenceFlow')
+      doc.getElementsByTagNameNS(BPMN_NS, 'sequenceFlow')
     )
     sequenceFlows.forEach((flow) => {
       const id = flow.getAttribute('id') || ''
