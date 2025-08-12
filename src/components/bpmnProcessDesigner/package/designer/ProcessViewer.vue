@@ -121,7 +121,7 @@ const props = defineProps({
   },
   view: {
     type: Object,
-    require: true
+    required: true
   }
 })
 
@@ -129,6 +129,7 @@ const processCanvas = ref()
 const bpmnViewer = ref<BpmnViewer | null>(null)
 const defaultZoom = ref(1) // 默认缩放比例
 const isLoading = ref(false) // 是否加载中
+const hasMounted = ref(false)
 
 const processInstance = ref<any>({}) // 流程实例
 const tasks = ref([]) // 流程任务
@@ -319,55 +320,44 @@ const importXML = async (xml: string) => {
   // 初始化流程图
   if (xml != null && xml !== '') {
     try {
-      // 在导入前修复XML中的问题
-      const fixedXml = fixSequenceFlowRefs(xml);
-      
-      bpmnViewer.value = new BpmnViewer({
+      const fixedXml = fixSequenceFlowRefs(xml)
+
+      const viewer = new BpmnViewer({
         additionalModules: [MoveCanvasModule],
         container: processCanvas.value
       })
-      // 增加点击事件
-      bpmnViewer.value.on('element.click', ({ element }) => {
+      bpmnViewer.value = viewer
+      viewer.on('element.click', ({ element }) => {
         onSelectElement(element)
       })
 
-      // 初始化 BPMN 视图
       isLoading.value = true
-      await bpmnViewer.value.importXML(fixedXml)
-      // 自定义成功的箭头
+      await viewer.importXML(fixedXml)
       addCustomDefs()
-    } catch (e) {
-      console.error('[BPM流程图] 导入XML出错:', e);
-      // 尝试显示错误信息
+    } catch (e: any) {
+      console.error('[BPM流程图] 导入XML出错:', e)
       clearViewer()
-      
-      // 如果错误是关于 SequenceFlow 的 sourceRef/targetRef 问题，提供更详细的错误信息
-      if (
-        e.toString().includes('targetRef not specified') ||
-        e.toString().includes('sourceRef not specified')
-      ) {
-        console.warn('[BPM流程图] 检测到SequenceFlow缺少 sourceRef 或 targetRef，尝试移除问题元素后重新导入');
-        
+
+      const msg = typeof e === 'string' ? e : e?.toString?.() ?? ''
+      if (msg.includes('targetRef not specified') || msg.includes('sourceRef not specified')) {
+        console.warn('[BPM流程图] 检测到SequenceFlow缺少 sourceRef 或 targetRef，尝试移除问题元素后重新导入')
+
         try {
-          // 移除所有的SequenceFlow，进行一次兜底尝试
-          const fallbackXml = xml.replace(/<bpmn:SequenceFlow[^>]*>[\s\S]*?<\/bpmn:SequenceFlow>/g, '');
-          
-          // 重新初始化查看器
-          bpmnViewer.value = new BpmnViewer({
+          const fallbackXml = xml.replace(/<bpmn:SequenceFlow[^>]*>[\s\S]*?<\/bpmn:SequenceFlow>/g, '')
+
+          const viewer = new BpmnViewer({
             additionalModules: [MoveCanvasModule],
             container: processCanvas.value
-          });
-          
-          // 重新导入XML
-          bpmnViewer.value.importXML(fallbackXml);
-          console.log('[BPM流程图] 已移除所有SequenceFlow元素，流程图仅显示节点');
+          })
+          bpmnViewer.value = viewer
+          await viewer.importXML(fallbackXml)
+          console.log('[BPM流程图] 已移除所有SequenceFlow元素，流程图仅显示节点')
         } catch (fallbackError) {
-          console.error('[BPM流程图] 降级方案也失败:', fallbackError);
+          console.error('[BPM流程图] 降级方案也失败:', fallbackError)
         }
       }
     } finally {
       isLoading.value = false
-      // 高亮流程
       setProcessStatus(props.view)
     }
   }
@@ -390,8 +380,8 @@ const setProcessStatus = (view: any) => {
     finishedSequenceFlowActivityIds,
     rejectedTaskActivityIds
   } = view
-  const canvas = bpmnViewer.value.get('canvas')
-  const elementRegistry = bpmnViewer.value.get('elementRegistry')
+  const canvas: any = bpmnViewer.value.get('canvas')
+  const elementRegistry: any = bpmnViewer.value.get('elementRegistry')
 
   // 已完成节点
   if (Array.isArray(finishedSequenceFlowActivityIds)) {
@@ -444,20 +434,25 @@ const setProcessStatus = (view: any) => {
 
 watch(
   () => props.xml,
-  (newXml) => {
-    importXML(newXml)
+  (newXml: string) => {
+    if (hasMounted.value) {
+      importXML(newXml)
+    }
   }
 )
 
 watch(
   () => props.view,
-  (newView) => {
-    setProcessStatus(newView)
+  (newView: any) => {
+    if (hasMounted.value) {
+      setProcessStatus(newView)
+    }
   }
 )
 
 /** mounted：初始化 */
 onMounted(() => {
+  hasMounted.value = true
   importXML(props.xml)
   setProcessStatus(props.view)
 })
@@ -465,5 +460,6 @@ onMounted(() => {
 /** unmount：销毁 */
 onBeforeUnmount(() => {
   clearViewer()
+  hasMounted.value = false
 })
 </script>
