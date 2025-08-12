@@ -607,7 +607,8 @@ const getProcessModelView = async () => {
   }
   // 请求BPMN模型视图数据 
   // 注：如果出现"failed to import <bpmn:SequenceFlow /> Error: targetRef not specified"错误
-  // 已在ProcessViewer组件中添加自动修复处理，会自动移除无效的连线并继续显示流程图
+  // 或者"sourceRef not specified"错误
+  // 已在 ProcessViewer 组件中添加自动修复处理，会自动移除无效的连线并继续显示流程图
   console.log('请求流程实例 BPMN 模型视图，ID:', props.id)
   const data = await ProcessInstanceApi.getProcessInstanceBpmnModelView(props.id)
   if (data) {

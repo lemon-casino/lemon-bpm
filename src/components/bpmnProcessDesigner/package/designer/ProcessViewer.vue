@@ -249,67 +249,58 @@ const onSelectElement = (element: any) => {
   }
 }
 
-/** 修复 SequenceFlow 中缺少 targetRef 的问题 */
-const fixSequenceFlowTargetRefs = (xml: string): string => {
+/** 修复 SequenceFlow 中缺少 sourceRef 或 targetRef 的问题 */
+const fixSequenceFlowRefs = (xml: string): string => {
   // 如果XML为空，直接返回
-  if (!xml) return xml;
-  
+  if (!xml) return xml
+
   try {
-    // 查找所有缺少 targetRef 的 SequenceFlow 标签
-    const regex = /<bpmn:SequenceFlow\s+id="([^"]+)"(?![^>]*targetRef=)[^>]*\/?>/g;
-    
-    // 计算找到的问题连线数量
-    const matches = xml.match(regex);
-    const matchCount = matches ? matches.length : 0;
-    
-    if (matchCount > 0) {
-      console.warn(`[BPM流程图] 发现 ${matchCount} 个缺少 targetRef 的 SequenceFlow 元素，已自动移除`);
-      
-      // 记录处理的元素ID
-      if (matches) {
-        matches.forEach(match => {
-          const idMatch = /<bpmn:SequenceFlow\s+id="([^"]+)"/.exec(match);
-          if (idMatch && idMatch[1]) {
-            console.info(`[BPM流程图] 移除无效连线: ID=${idMatch[1]}`);
-          }
-        });
+    // 查找所有 SequenceFlow 标签（仅处理自闭合标签）
+    const regex = /<bpmn:SequenceFlow\s+[^>]*id="([^"]+)"[^>]*\/?>/g
+    const matches = [...xml.matchAll(regex)]
+    const invalidIds: string[] = []
+
+    matches.forEach((match) => {
+      const fullTag = match[0]
+      const id = match[1]
+      const hasSource = /sourceRef=/.test(fullTag)
+      const hasTarget = /targetRef=/.test(fullTag)
+      if (!hasSource || !hasTarget) {
+        invalidIds.push(id)
+        console.info(`[BPM流程图] 移除无效连线: ID=${id}`)
+        xml = xml.replace(fullTag, `<!-- 已移除缺少引用的SequenceFlow ${id} -->`)
       }
-      
-      // 从XML中移除这些问题的连线
-      // 策略1: 移除整个 SequenceFlow 标签
-      let fixedXml = xml.replace(regex, '<!-- 已移除缺少targetRef的SequenceFlow $1 -->');
-      
-      // 策略2: 同时尝试移除相关的 BPMNEdge 元素 (DI部分的可视化)
-      matches?.forEach(match => {
-        const idMatch = /<bpmn:SequenceFlow\s+id="([^"]+)"/.exec(match);
-        if (idMatch && idMatch[1]) {
-          const sequenceFlowId = idMatch[1];
-          const bpmnEdgeRegex = new RegExp(`<bpmndi:BPMNEdge[^>]*bpmnElement="${sequenceFlowId}"[^>]*>([\\s\\S]*?)<\\/bpmndi:BPMNEdge>`, 'g');
-          const beforeEdgeCount = (fixedXml.match(bpmnEdgeRegex) || []).length;
-          fixedXml = fixedXml.replace(bpmnEdgeRegex, `<!-- 已移除相关的 BPMNEdge for ${sequenceFlowId} -->`);
-          const afterEdgeCount = (fixedXml.match(bpmnEdgeRegex) || []).length;
-          
-          // 记录移除的边缘元素数量
-          if (beforeEdgeCount > afterEdgeCount) {
-            console.info(`[BPM流程图] 移除相关的图形元素: ID=${sequenceFlowId}, 数量=${beforeEdgeCount - afterEdgeCount}`);
-          }
+    })
+
+    if (invalidIds.length > 0) {
+      console.warn(`[BPM流程图] 发现 ${invalidIds.length} 个缺少 sourceRef 或 targetRef 的 SequenceFlow 元素，已自动移除`)
+
+      // 同时尝试移除相关的 BPMNEdge 元素 (DI部分的可视化)
+      invalidIds.forEach((sequenceFlowId) => {
+        const bpmnEdgeRegex = new RegExp(`<bpmndi:BPMNEdge[^>]*bpmnElement="${sequenceFlowId}"[^>]*>([\\s\\S]*?)<\\/bpmndi:BPMNEdge>`, 'g')
+        const beforeEdgeCount = (xml.match(bpmnEdgeRegex) || []).length
+        xml = xml.replace(bpmnEdgeRegex, `<!-- 已移除相关的 BPMNEdge for ${sequenceFlowId} -->`)
+        const afterEdgeCount = (xml.match(bpmnEdgeRegex) || []).length
+
+        // 记录移除的边缘元素数量
+        if (beforeEdgeCount > afterEdgeCount) {
+          console.info(`[BPM流程图] 移除相关的图形元素: ID=${sequenceFlowId}, 数量=${beforeEdgeCount - afterEdgeCount}`)
         }
-      });
-      
-      console.info('[BPM流程图] XML修复完成，已移除所有无效连线');
-      return fixedXml;
+      })
+
+      console.info('[BPM流程图] XML修复完成，已移除所有无效连线')
     }
-    
-    return xml;
+
+    return xml
   } catch (error) {
-    console.error('[BPM流程图] 修复XML时出错:', error);
+    console.error('[BPM流程图] 修复XML时出错:', error)
     // 提供详细的错误信息
     if (error instanceof Error) {
-      console.error('[BPM流程图] 错误详情:', error.message);
-      console.error('[BPM流程图] 错误堆栈:', error.stack);
+      console.error('[BPM流程图] 错误详情:', error.message)
+      console.error('[BPM流程图] 错误堆栈:', error.stack)
     }
-    
-    return xml; // 如果处理过程中出错，返回原始XML
+
+    return xml // 如果处理过程中出错，返回原始XML
   }
 }
 
@@ -322,7 +313,7 @@ const importXML = async (xml: string) => {
   if (xml != null && xml !== '') {
     try {
       // 在导入前修复XML中的问题
-      const fixedXml = fixSequenceFlowTargetRefs(xml);
+      const fixedXml = fixSequenceFlowRefs(xml);
       
       bpmnViewer.value = new BpmnViewer({
         additionalModules: [MoveCanvasModule],
@@ -343,9 +334,12 @@ const importXML = async (xml: string) => {
       // 尝试显示错误信息
       clearViewer()
       
-      // 如果错误是关于SequenceFlow的targetRef问题，提供更详细的错误信息
-      if (e.toString().includes('targetRef not specified')) {
-        console.warn('[BPM流程图] 检测到SequenceFlow缺少targetRef，尝试移除问题元素后重新导入');
+      // 如果错误是关于 SequenceFlow 的 sourceRef/targetRef 问题，提供更详细的错误信息
+      if (
+        e.toString().includes('targetRef not specified') ||
+        e.toString().includes('sourceRef not specified')
+      ) {
+        console.warn('[BPM流程图] 检测到SequenceFlow缺少 sourceRef 或 targetRef，尝试移除问题元素后重新导入');
         
         try {
           // 移除所有的SequenceFlow，进行一次兜底尝试
