@@ -167,13 +167,10 @@ const processZoomOut = (zoomStep = 0.1) => {
 
 /** 流程图预览清空 */
 const clearViewer = () => {
-  if (processCanvas.value) {
-    processCanvas.value.innerHTML = ''
-  }
   if (bpmnViewer.value) {
     bpmnViewer.value.destroy()
+    bpmnViewer.value = null
   }
-  bpmnViewer.value = null
 }
 
 /** 添加自定义箭头 */
@@ -314,52 +311,41 @@ const fixSequenceFlowRefs = (xml: string): string => {
 
 /** 初始化 BPMN 视图 */
 const importXML = async (xml: string) => {
-  // 清空流程图
-  clearViewer()
+  if (!xml) return
 
-  // 初始化流程图
-  if (xml != null && xml !== '') {
-    try {
-      const fixedXml = fixSequenceFlowRefs(xml)
+  try {
+    const fixedXml = fixSequenceFlowRefs(xml)
 
+    if (!bpmnViewer.value) {
       const viewer = new BpmnViewer({
         additionalModules: [MoveCanvasModule],
         container: processCanvas.value
       })
       bpmnViewer.value = viewer
-      viewer.on('element.click', ({ element }) => {
-        onSelectElement(element)
-      })
-
-      isLoading.value = true
-      await viewer.importXML(fixedXml)
-      addCustomDefs()
-    } catch (e: any) {
-      console.error('[BPM流程图] 导入XML出错:', e)
-      clearViewer()
-
-      const msg = typeof e === 'string' ? e : e?.toString?.() ?? ''
-      if (msg.includes('targetRef not specified') || msg.includes('sourceRef not specified')) {
-        console.warn('[BPM流程图] 检测到SequenceFlow缺少 sourceRef 或 targetRef，尝试移除问题元素后重新导入')
-
-        try {
-          const fallbackXml = xml.replace(/<bpmn:SequenceFlow[^>]*>[\s\S]*?<\/bpmn:SequenceFlow>/g, '')
-
-          const viewer = new BpmnViewer({
-            additionalModules: [MoveCanvasModule],
-            container: processCanvas.value
-          })
-          bpmnViewer.value = viewer
-          await viewer.importXML(fallbackXml)
-          console.log('[BPM流程图] 已移除所有SequenceFlow元素，流程图仅显示节点')
-        } catch (fallbackError) {
-          console.error('[BPM流程图] 降级方案也失败:', fallbackError)
-        }
-      }
-    } finally {
-      isLoading.value = false
-      setProcessStatus(props.view)
+      viewer.on('element.click', ({ element }) => onSelectElement(element))
     }
+
+    isLoading.value = true
+    await bpmnViewer.value.importXML(fixedXml)
+    addCustomDefs()
+  } catch (e: any) {
+    console.error('[BPM流程图] 导入XML出错:', e)
+
+    const msg = typeof e === 'string' ? e : e?.toString?.() ?? ''
+    if (msg.includes('targetRef not specified') || msg.includes('sourceRef not specified')) {
+      console.warn('[BPM流程图] 检测到SequenceFlow缺少 sourceRef 或 targetRef，尝试移除问题元素后重新导入')
+
+      try {
+        const fallbackXml = xml.replace(/<bpmn:SequenceFlow[^>]*>[\s\S]*?<\/bpmn:SequenceFlow>/g, '')
+        await bpmnViewer.value!.importXML(fallbackXml)
+        console.log('[BPM流程图] 已移除所有SequenceFlow元素，流程图仅显示节点')
+      } catch (fallbackError) {
+        console.error('[BPM流程图] 降级方案也失败:', fallbackError)
+      }
+    }
+  } finally {
+    isLoading.value = false
+    setProcessStatus(props.view)
   }
 }
 
