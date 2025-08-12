@@ -261,20 +261,30 @@ const onSelectElement = (element: any) => {
 
 /** 修复 SequenceFlow 中缺少 sourceRef 或 targetRef 的问题 */
 const fixSequenceFlowRefs = (xml: string): string => {
-  // 如果XML为空，直接返回
   if (!xml) return xml
 
   try {
     const parser = new DOMParser()
     const doc = parser.parseFromString(xml, 'application/xml')
 
+    // 如果解析失败直接返回原始 XML
+    if (doc.getElementsByTagName('parsererror').length) {
+      return xml
+    }
+
+    const BPMN_NS = 'http://www.omg.org/spec/BPMN/20100524/MODEL'
+    const BPMNDI_NS = 'http://www.omg.org/spec/BPMN/20100524/DI'
+
     const invalidIds: string[] = []
-    // 查找所有 SequenceFlow 标签
-    const sequenceFlows = Array.from(doc.getElementsByTagName('bpmn:SequenceFlow'))
+    const sequenceFlows = Array.from(
+      doc.getElementsByTagNameNS(BPMN_NS, 'SequenceFlow')
+    )
     sequenceFlows.forEach((flow) => {
       const id = flow.getAttribute('id') || ''
-      const hasSource = flow.hasAttribute('sourceRef')
-      const hasTarget = flow.hasAttribute('targetRef')
+      const sourceRef = flow.getAttribute('sourceRef')
+      const targetRef = flow.getAttribute('targetRef')
+      const hasSource = !!sourceRef
+      const hasTarget = !!targetRef
       if (!hasSource || !hasTarget) {
         invalidIds.push(id)
         flow.parentNode?.removeChild(flow)
@@ -282,30 +292,19 @@ const fixSequenceFlowRefs = (xml: string): string => {
     })
 
     if (invalidIds.length > 0) {
-      console.warn(`[BPM流程图] 发现 ${invalidIds.length} 个缺少 sourceRef 或 targetRef 的 SequenceFlow 元素，已自动移除`)
-
-      // 同时尝试移除相关的 BPMNEdge 元素 (DI部分的可视化)
-      const edges = Array.from(doc.getElementsByTagName('bpmndi:BPMNEdge'))
+      const edges = Array.from(doc.getElementsByTagNameNS(BPMNDI_NS, 'BPMNEdge'))
       edges.forEach((edge) => {
         const ref = edge.getAttribute('bpmnElement') || ''
         if (invalidIds.includes(ref)) {
           edge.parentNode?.removeChild(edge)
         }
       })
-
-      console.info('[BPM流程图] XML修复完成，已移除所有无效连线')
     }
 
     return new XMLSerializer().serializeToString(doc)
-  } catch (error) {
-    console.error('[BPM流程图] 修复XML时出错:', error)
-    // 提供详细的错误信息
-    if (error instanceof Error) {
-      console.error('[BPM流程图] 错误详情:', error.message)
-      console.error('[BPM流程图] 错误堆栈:', error.stack)
-    }
-
-    return xml // 如果处理过程中出错，返回原始XML
+  } catch (err) {
+    console.error('[BPM流程图] 修复XML时出错:', err)
+    return xml
   }
 }
 
@@ -313,6 +312,7 @@ const fixSequenceFlowRefs = (xml: string): string => {
 const importXML = async (xml: string) => {
   if (!xml) return
 
+  let imported = false
   try {
     const fixedXml = fixSequenceFlowRefs(xml)
 
@@ -328,24 +328,14 @@ const importXML = async (xml: string) => {
     isLoading.value = true
     await bpmnViewer.value.importXML(fixedXml)
     addCustomDefs()
+    imported = true
   } catch (e: any) {
     console.error('[BPM流程图] 导入XML出错:', e)
-
-    const msg = typeof e === 'string' ? e : e?.toString?.() ?? ''
-    if (msg.includes('targetRef not specified') || msg.includes('sourceRef not specified')) {
-      console.warn('[BPM流程图] 检测到SequenceFlow缺少 sourceRef 或 targetRef，尝试移除问题元素后重新导入')
-
-      try {
-        const fallbackXml = xml.replace(/<bpmn:SequenceFlow[^>]*>[\s\S]*?<\/bpmn:SequenceFlow>/g, '')
-        await bpmnViewer.value!.importXML(fallbackXml)
-        console.log('[BPM流程图] 已移除所有SequenceFlow元素，流程图仅显示节点')
-      } catch (fallbackError) {
-        console.error('[BPM流程图] 降级方案也失败:', fallbackError)
-      }
-    }
   } finally {
     isLoading.value = false
-    setProcessStatus(props.view)
+    if (imported) {
+      setProcessStatus(props.view)
+    }
   }
 }
 
