@@ -2,38 +2,7 @@
   <div class="process-viewer">
     <div style="height: 100%" ref="processCanvas" v-show="!isLoading"> </div>
     <!-- 自定义箭头样式，用于已完成状态下流程连线箭头 -->
-    <defs ref="customDefs">
-      <marker
-        id="sequenceflow-end-white-success"
-        viewBox="0 0 20 20"
-        refX="11"
-        refY="10"
-        markerWidth="10"
-        markerHeight="10"
-        orient="auto"
-      >
-        <path
-          class="success-arrow"
-          d="M 1 5 L 11 10 L 1 15 Z"
-          style="stroke-width: 1px; stroke-linecap: round; stroke-dasharray: 10000, 1"
-        />
-      </marker>
-      <marker
-        id="conditional-flow-marker-white-success"
-        viewBox="0 0 20 20"
-        refX="-1"
-        refY="10"
-        markerWidth="10"
-        markerHeight="10"
-        orient="auto"
-      >
-        <path
-          class="success-conditional"
-          d="M 0 10 L 8 6 L 16 10 L 8 14 Z"
-          style="stroke-width: 1px; stroke-linecap: round; stroke-dasharray: 10000, 1"
-        />
-      </marker>
-    </defs>
+    <!-- 通过脚本动态创建 defs，避免直接操作由 Vue 管理的 DOM 节点导致的报错 -->
 
     <!-- 审批记录 -->
     <el-dialog :title="dialogTitle || '审批记录'" v-model="dialogVisible" width="1000px">
@@ -158,7 +127,6 @@ const props = defineProps({
 
 const processCanvas = ref()
 const bpmnViewer = ref<BpmnViewer | null>(null)
-const customDefs = ref()
 const defaultZoom = ref(1) // 默认缩放比例
 const isLoading = ref(false) // 是否加载中
 
@@ -209,13 +177,57 @@ const clearViewer = () => {
 
 /** 添加自定义箭头 */
 // TODO 芋艿：自定义箭头不生效，有点奇怪！！！！相关的 marker-end、marker-start 暂时也注释了！！！
+// 通过脚本动态创建完成状态下的连线箭头样式
 const addCustomDefs = () => {
   if (!bpmnViewer.value) {
     return
   }
-  const canvas = bpmnViewer.value?.get('canvas')
-  const svg = canvas?._svg
-  svg.appendChild(customDefs.value)
+  const canvas = bpmnViewer.value.get('canvas')
+  const svg: SVGSVGElement = canvas?._svg
+  if (!svg) {
+    return
+  }
+
+  // 如果已经存在自定义箭头，则无需再次添加
+  if (svg.querySelector('#sequenceflow-end-white-success')) {
+    return
+  }
+
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs')
+
+  const successMarker = document.createElementNS('http://www.w3.org/2000/svg', 'marker')
+  successMarker.setAttribute('id', 'sequenceflow-end-white-success')
+  successMarker.setAttribute('viewBox', '0 0 20 20')
+  successMarker.setAttribute('refX', '11')
+  successMarker.setAttribute('refY', '10')
+  successMarker.setAttribute('markerWidth', '10')
+  successMarker.setAttribute('markerHeight', '10')
+  successMarker.setAttribute('orient', 'auto')
+
+  const successPath = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+  successPath.setAttribute('class', 'success-arrow')
+  successPath.setAttribute('d', 'M 1 5 L 11 10 L 1 15 Z')
+  successPath.setAttribute('style', 'stroke-width: 1px; stroke-linecap: round; stroke-dasharray: 10000, 1')
+  successMarker.appendChild(successPath)
+
+  const conditionalMarker = document.createElementNS('http://www.w3.org/2000/svg', 'marker')
+  conditionalMarker.setAttribute('id', 'conditional-flow-marker-white-success')
+  conditionalMarker.setAttribute('viewBox', '0 0 20 20')
+  conditionalMarker.setAttribute('refX', '-1')
+  conditionalMarker.setAttribute('refY', '10')
+  conditionalMarker.setAttribute('markerWidth', '10')
+  conditionalMarker.setAttribute('markerHeight', '10')
+  conditionalMarker.setAttribute('orient', 'auto')
+
+  const conditionalPath = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+  conditionalPath.setAttribute('class', 'success-conditional')
+  conditionalPath.setAttribute('d', 'M 0 10 L 8 6 L 16 10 L 8 14 Z')
+  conditionalPath.setAttribute('style', 'stroke-width: 1px; stroke-linecap: round; stroke-dasharray: 10000, 1')
+  conditionalMarker.appendChild(conditionalPath)
+
+  defs.appendChild(successMarker)
+  defs.appendChild(conditionalMarker)
+  svg.appendChild(defs)
 }
 
 /** 节点选中 */
@@ -434,16 +446,14 @@ watch(
   () => props.xml,
   (newXml) => {
     importXML(newXml)
-  },
-  { immediate: true }
+  }
 )
 
 watch(
   () => props.view,
   (newView) => {
     setProcessStatus(newView)
-  },
-  { immediate: true }
+  }
 )
 
 /** mounted：初始化 */
