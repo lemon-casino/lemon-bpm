@@ -2,38 +2,7 @@
   <div class="process-viewer">
     <div style="height: 100%" ref="processCanvas" v-show="!isLoading"> </div>
     <!-- 自定义箭头样式，用于已完成状态下流程连线箭头 -->
-    <defs ref="customDefs">
-      <marker
-        id="sequenceflow-end-white-success"
-        viewBox="0 0 20 20"
-        refX="11"
-        refY="10"
-        markerWidth="10"
-        markerHeight="10"
-        orient="auto"
-      >
-        <path
-          class="success-arrow"
-          d="M 1 5 L 11 10 L 1 15 Z"
-          style="stroke-width: 1px; stroke-linecap: round; stroke-dasharray: 10000, 1"
-        />
-      </marker>
-      <marker
-        id="conditional-flow-marker-white-success"
-        viewBox="0 0 20 20"
-        refX="-1"
-        refY="10"
-        markerWidth="10"
-        markerHeight="10"
-        orient="auto"
-      >
-        <path
-          class="success-conditional"
-          d="M 0 10 L 8 6 L 16 10 L 8 14 Z"
-          style="stroke-width: 1px; stroke-linecap: round; stroke-dasharray: 10000, 1"
-        />
-      </marker>
-    </defs>
+    <!-- 通过脚本动态创建 defs，避免直接操作由 Vue 管理的 DOM 节点导致的报错 -->
 
     <!-- 审批记录 -->
     <el-dialog :title="dialogTitle || '审批记录'" v-model="dialogVisible" width="1000px">
@@ -152,15 +121,15 @@ const props = defineProps({
   },
   view: {
     type: Object,
-    require: true
+    required: true
   }
 })
 
 const processCanvas = ref()
 const bpmnViewer = ref<BpmnViewer | null>(null)
-const customDefs = ref()
 const defaultZoom = ref(1) // 默认缩放比例
 const isLoading = ref(false) // 是否加载中
+const hasMounted = ref(false)
 
 const processInstance = ref<any>({}) // 流程实例
 const tasks = ref([]) // 流程任务
@@ -198,24 +167,65 @@ const processZoomOut = (zoomStep = 0.1) => {
 
 /** 流程图预览清空 */
 const clearViewer = () => {
-  if (processCanvas.value) {
-    processCanvas.value.innerHTML = ''
-  }
   if (bpmnViewer.value) {
     bpmnViewer.value.destroy()
+    bpmnViewer.value = null
   }
-  bpmnViewer.value = null
 }
 
 /** 添加自定义箭头 */
 // TODO 芋艿：自定义箭头不生效，有点奇怪！！！！相关的 marker-end、marker-start 暂时也注释了！！！
+// 通过脚本动态创建完成状态下的连线箭头样式
 const addCustomDefs = () => {
   if (!bpmnViewer.value) {
     return
   }
-  const canvas = bpmnViewer.value?.get('canvas')
-  const svg = canvas?._svg
-  svg.appendChild(customDefs.value)
+  const canvas = bpmnViewer.value.get('canvas')
+  const svg: SVGSVGElement = canvas?._svg
+  if (!svg) {
+    return
+  }
+
+  // 如果已经存在自定义箭头，则无需再次添加
+  if (svg.querySelector('#sequenceflow-end-white-success')) {
+    return
+  }
+
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs')
+
+  const successMarker = document.createElementNS('http://www.w3.org/2000/svg', 'marker')
+  successMarker.setAttribute('id', 'sequenceflow-end-white-success')
+  successMarker.setAttribute('viewBox', '0 0 20 20')
+  successMarker.setAttribute('refX', '11')
+  successMarker.setAttribute('refY', '10')
+  successMarker.setAttribute('markerWidth', '10')
+  successMarker.setAttribute('markerHeight', '10')
+  successMarker.setAttribute('orient', 'auto')
+
+  const successPath = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+  successPath.setAttribute('class', 'success-arrow')
+  successPath.setAttribute('d', 'M 1 5 L 11 10 L 1 15 Z')
+  successPath.setAttribute('style', 'stroke-width: 1px; stroke-linecap: round; stroke-dasharray: 10000, 1')
+  successMarker.appendChild(successPath)
+
+  const conditionalMarker = document.createElementNS('http://www.w3.org/2000/svg', 'marker')
+  conditionalMarker.setAttribute('id', 'conditional-flow-marker-white-success')
+  conditionalMarker.setAttribute('viewBox', '0 0 20 20')
+  conditionalMarker.setAttribute('refX', '-1')
+  conditionalMarker.setAttribute('refY', '10')
+  conditionalMarker.setAttribute('markerWidth', '10')
+  conditionalMarker.setAttribute('markerHeight', '10')
+  conditionalMarker.setAttribute('orient', 'auto')
+
+  const conditionalPath = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+  conditionalPath.setAttribute('class', 'success-conditional')
+  conditionalPath.setAttribute('d', 'M 0 10 L 8 6 L 16 10 L 8 14 Z')
+  conditionalPath.setAttribute('style', 'stroke-width: 1px; stroke-linecap: round; stroke-dasharray: 10000, 1')
+  conditionalMarker.appendChild(conditionalPath)
+
+  defs.appendChild(successMarker)
+  defs.appendChild(conditionalMarker)
+  svg.appendChild(defs)
 }
 
 /** 节点选中 */
@@ -249,124 +259,81 @@ const onSelectElement = (element: any) => {
   }
 }
 
-/** 修复 SequenceFlow 中缺少 targetRef 的问题 */
-const fixSequenceFlowTargetRefs = (xml: string): string => {
-  // 如果XML为空，直接返回
-  if (!xml) return xml;
-  
+/** 修复 SequenceFlow 中缺少 sourceRef 或 targetRef 的问题 */
+const fixSequenceFlowRefs = (xml: string): string => {
+  if (!xml) return xml
+
   try {
-    // 查找所有缺少 targetRef 的 SequenceFlow 标签
-    const regex = /<bpmn:SequenceFlow\s+id="([^"]+)"(?![^>]*targetRef=)[^>]*\/?>/g;
-    
-    // 计算找到的问题连线数量
-    const matches = xml.match(regex);
-    const matchCount = matches ? matches.length : 0;
-    
-    if (matchCount > 0) {
-      console.warn(`[BPM流程图] 发现 ${matchCount} 个缺少 targetRef 的 SequenceFlow 元素，已自动移除`);
-      
-      // 记录处理的元素ID
-      if (matches) {
-        matches.forEach(match => {
-          const idMatch = /<bpmn:SequenceFlow\s+id="([^"]+)"/.exec(match);
-          if (idMatch && idMatch[1]) {
-            console.info(`[BPM流程图] 移除无效连线: ID=${idMatch[1]}`);
-          }
-        });
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(xml, 'application/xml')
+
+    // 如果解析失败直接返回原始 XML
+    if (doc.getElementsByTagName('parsererror').length) {
+      return xml
+    }
+
+    const BPMN_NS = 'http://www.omg.org/spec/BPMN/20100524/MODEL'
+    const BPMNDI_NS = 'http://www.omg.org/spec/BPMN/20100524/DI'
+
+    const invalidIds: string[] = []
+    const sequenceFlows = Array.from(
+      doc.getElementsByTagNameNS(BPMN_NS, 'sequenceFlow')
+    )
+    sequenceFlows.forEach((flow) => {
+      const id = flow.getAttribute('id') || ''
+      const sourceRef = flow.getAttribute('sourceRef')
+      const targetRef = flow.getAttribute('targetRef')
+      const hasSource = !!sourceRef
+      const hasTarget = !!targetRef
+      if (!hasSource || !hasTarget) {
+        invalidIds.push(id)
+        flow.parentNode?.removeChild(flow)
       }
-      
-      // 从XML中移除这些问题的连线
-      // 策略1: 移除整个 SequenceFlow 标签
-      let fixedXml = xml.replace(regex, '<!-- 已移除缺少targetRef的SequenceFlow $1 -->');
-      
-      // 策略2: 同时尝试移除相关的 BPMNEdge 元素 (DI部分的可视化)
-      matches?.forEach(match => {
-        const idMatch = /<bpmn:SequenceFlow\s+id="([^"]+)"/.exec(match);
-        if (idMatch && idMatch[1]) {
-          const sequenceFlowId = idMatch[1];
-          const bpmnEdgeRegex = new RegExp(`<bpmndi:BPMNEdge[^>]*bpmnElement="${sequenceFlowId}"[^>]*>([\\s\\S]*?)<\\/bpmndi:BPMNEdge>`, 'g');
-          const beforeEdgeCount = (fixedXml.match(bpmnEdgeRegex) || []).length;
-          fixedXml = fixedXml.replace(bpmnEdgeRegex, `<!-- 已移除相关的 BPMNEdge for ${sequenceFlowId} -->`);
-          const afterEdgeCount = (fixedXml.match(bpmnEdgeRegex) || []).length;
-          
-          // 记录移除的边缘元素数量
-          if (beforeEdgeCount > afterEdgeCount) {
-            console.info(`[BPM流程图] 移除相关的图形元素: ID=${sequenceFlowId}, 数量=${beforeEdgeCount - afterEdgeCount}`);
-          }
+    })
+
+    if (invalidIds.length > 0) {
+      const edges = Array.from(doc.getElementsByTagNameNS(BPMNDI_NS, 'BPMNEdge'))
+      edges.forEach((edge) => {
+        const ref = edge.getAttribute('bpmnElement') || ''
+        if (invalidIds.includes(ref)) {
+          edge.parentNode?.removeChild(edge)
         }
-      });
-      
-      console.info('[BPM流程图] XML修复完成，已移除所有无效连线');
-      return fixedXml;
+      })
     }
-    
-    return xml;
-  } catch (error) {
-    console.error('[BPM流程图] 修复XML时出错:', error);
-    // 提供详细的错误信息
-    if (error instanceof Error) {
-      console.error('[BPM流程图] 错误详情:', error.message);
-      console.error('[BPM流程图] 错误堆栈:', error.stack);
-    }
-    
-    return xml; // 如果处理过程中出错，返回原始XML
+
+    return new XMLSerializer().serializeToString(doc)
+  } catch (err) {
+    console.error('[BPM流程图] 修复XML时出错:', err)
+    return xml
   }
 }
 
 /** 初始化 BPMN 视图 */
 const importXML = async (xml: string) => {
-  // 清空流程图
-  clearViewer()
+  if (!xml) return
 
-  // 初始化流程图
-  if (xml != null && xml !== '') {
-    try {
-      // 在导入前修复XML中的问题
-      const fixedXml = fixSequenceFlowTargetRefs(xml);
-      
-      bpmnViewer.value = new BpmnViewer({
+  let imported = false
+  try {
+    const fixedXml = fixSequenceFlowRefs(xml)
+
+    if (!bpmnViewer.value) {
+      const viewer = new BpmnViewer({
         additionalModules: [MoveCanvasModule],
         container: processCanvas.value
       })
-      // 增加点击事件
-      bpmnViewer.value.on('element.click', ({ element }) => {
-        onSelectElement(element)
-      })
+      bpmnViewer.value = viewer
+      viewer.on('element.click', ({ element }) => onSelectElement(element))
+    }
 
-      // 初始化 BPMN 视图
-      isLoading.value = true
-      await bpmnViewer.value.importXML(fixedXml)
-      // 自定义成功的箭头
-      addCustomDefs()
-    } catch (e) {
-      console.error('[BPM流程图] 导入XML出错:', e);
-      // 尝试显示错误信息
-      clearViewer()
-      
-      // 如果错误是关于SequenceFlow的targetRef问题，提供更详细的错误信息
-      if (e.toString().includes('targetRef not specified')) {
-        console.warn('[BPM流程图] 检测到SequenceFlow缺少targetRef，尝试移除问题元素后重新导入');
-        
-        try {
-          // 移除所有的SequenceFlow，进行一次兜底尝试
-          const fallbackXml = xml.replace(/<bpmn:SequenceFlow[^>]*>[\s\S]*?<\/bpmn:SequenceFlow>/g, '');
-          
-          // 重新初始化查看器
-          bpmnViewer.value = new BpmnViewer({
-            additionalModules: [MoveCanvasModule],
-            container: processCanvas.value
-          });
-          
-          // 重新导入XML
-          bpmnViewer.value.importXML(fallbackXml);
-          console.log('[BPM流程图] 已移除所有SequenceFlow元素，流程图仅显示节点');
-        } catch (fallbackError) {
-          console.error('[BPM流程图] 降级方案也失败:', fallbackError);
-        }
-      }
-    } finally {
-      isLoading.value = false
-      // 高亮流程
+    isLoading.value = true
+    await bpmnViewer.value.importXML(fixedXml)
+    addCustomDefs()
+    imported = true
+  } catch (e: any) {
+    console.error('[BPM流程图] 导入XML出错:', e)
+  } finally {
+    isLoading.value = false
+    if (imported) {
       setProcessStatus(props.view)
     }
   }
@@ -389,8 +356,8 @@ const setProcessStatus = (view: any) => {
     finishedSequenceFlowActivityIds,
     rejectedTaskActivityIds
   } = view
-  const canvas = bpmnViewer.value.get('canvas')
-  const elementRegistry = bpmnViewer.value.get('elementRegistry')
+  const canvas: any = bpmnViewer.value.get('canvas')
+  const elementRegistry: any = bpmnViewer.value.get('elementRegistry')
 
   // 已完成节点
   if (Array.isArray(finishedSequenceFlowActivityIds)) {
@@ -443,22 +410,25 @@ const setProcessStatus = (view: any) => {
 
 watch(
   () => props.xml,
-  (newXml) => {
-    importXML(newXml)
-  },
-  { immediate: true }
+  (newXml: string) => {
+    if (hasMounted.value) {
+      importXML(newXml)
+    }
+  }
 )
 
 watch(
   () => props.view,
-  (newView) => {
-    setProcessStatus(newView)
-  },
-  { immediate: true }
+  (newView: any) => {
+    if (hasMounted.value) {
+      setProcessStatus(newView)
+    }
+  }
 )
 
 /** mounted：初始化 */
 onMounted(() => {
+  hasMounted.value = true
   importXML(props.xml)
   setProcessStatus(props.view)
 })
@@ -466,5 +436,6 @@ onMounted(() => {
 /** unmount：销毁 */
 onBeforeUnmount(() => {
   clearViewer()
+  hasMounted.value = false
 })
 </script>
