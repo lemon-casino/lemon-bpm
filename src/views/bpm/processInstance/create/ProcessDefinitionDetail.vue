@@ -158,6 +158,8 @@ const activeTab = ref('form') // 当前的 Tab
 const activityNodes = ref<ProcessInstanceApi.ApprovalNodeInfo[]>([]) // 审批节点信息
 // 添加文件上传状态变量
 const fileUploading = ref(false) // 是否有文件正在上传
+// 是否重新发起流程
+const isReapply = ref(false)
 
 // 草稿箱相关
 const draftDialogRef = ref()
@@ -171,6 +173,8 @@ const initProcessInfo = async (row: any, formVariables?: any) => {
   // 重置指定审批人
   startUserSelectTasks.value = []
   startUserSelectAssignees.value = {}
+  // 记录是否为重新发起流程
+  isReapply.value = !!(formVariables && Object.keys(formVariables).length > 0)
 
   // 情况一：流程表单
   if (row.formType == BpmModelFormType.NORMAL) {
@@ -227,8 +231,8 @@ watch(
   }
 )
 /** 获取审批详情 */
-const getApprovalDetail = async (row: any) => {
-  try {
+  const getApprovalDetail = async (row: any) => {
+    try {
     // TODO 获取审批详情，设置 activityId 为发起人节点（为了获取字段权限。暂时只对 Simple 设计器有效）；@jason：这里可以去掉 activityId 么？
     const data = await ProcessInstanceApi.getApprovalDetail({
       processDefinitionId: row.id,
@@ -262,18 +266,22 @@ const getApprovalDetail = async (row: any) => {
     }
 
     // 获取表单字段权限
-    const formFieldsPermission = data.formFieldsPermission
-    formFields.value = data.formFieldsPermission
-    // console.log('formFields', formFields.value)
-    // 设置表单字段权限
-    if (formFieldsPermission) {
-      Object.keys(formFieldsPermission).forEach((item) => {
-        setFieldPermission(item, formFieldsPermission[item])
-      })
+      const formFieldsPermission = data.formFieldsPermission
+      formFields.value = data.formFieldsPermission
+      // console.log('formFields', formFields.value)
+      // 设置表单字段权限
+      if (formFieldsPermission) {
+        Object.keys(formFieldsPermission).forEach((item) => {
+          setFieldPermission(item, formFieldsPermission[item])
+        })
+        // 如果是重新发起流程，清除无编辑权限的字段数据
+        if (isReapply.value) {
+          clearNoEditFields(detailForm.value.value)
+        }
+      }
+    } finally {
     }
-  } finally {
   }
-}
 
 /**
  * 设置表单权限
@@ -291,6 +299,26 @@ const setFieldPermission = (field: string, permission: string) => {
     //@ts-ignore
     fApi.value?.hidden(true, field)
   }
+}
+
+/**
+ * 清除无编辑权限字段的值
+ */
+const clearNoEditFields = (values: Record<string, any>) => {
+  if (!values) {
+    return
+  }
+  Object.keys(formFields.value || {}).forEach((key) => {
+    const perm = formFields.value[key]
+    if (perm && perm !== FieldPermissionType.WRITE && key in values) {
+      delete values[key]
+      try {
+        fApi.value?.setValue(key, undefined)
+      } catch (e) {
+        // ignore
+      }
+    }
+  })
 }
 
 /** 提交按钮 */
@@ -549,52 +577,64 @@ const fillFormVariables = (formVariables) => {
   if (!formVariables || Object.keys(formVariables).length === 0) {
     return
   }
-  
+
+  // 过滤无编辑权限的字段
+  const editableVariables = { ...formVariables }
+  Object.keys(formFields.value || {}).forEach((key) => {
+    const perm = formFields.value[key]
+    if (perm && perm !== FieldPermissionType.WRITE) {
+      delete editableVariables[key]
+    }
+  })
+
   try {
     // 更新表单数据
     if (detailForm.value && fApi.value) {
       // 先保存表单变量到detailForm.value
-      detailForm.value.value = { ...formVariables }
-      
+      detailForm.value.value = { ...editableVariables }
+
       // 重新解析表单规则和配置
       if (props.selectProcessDefinition && props.selectProcessDefinition.formConf && props.selectProcessDefinition.formFields) {
         // 保留当前值，重新设置表单
-        setConfAndFields2(detailForm, props.selectProcessDefinition.formConf, props.selectProcessDefinition.formFields, formVariables)
-        
+        setConfAndFields2(detailForm, props.selectProcessDefinition.formConf, props.selectProcessDefinition.formFields, editableVariables)
+
         // 等待表单重新渲染
-        nextTick(async () => {
+        nextTick(() => {
           // 设置表单字段权限
           if (formFields.value) {
             Object.keys(formFields.value).forEach((item) => {
               setFieldPermission(item, formFields.value[item])
             })
           }
-          
+
           // 隐藏提交按钮
           fApi.value?.btn.show(false)
-          
+
           // 强制刷新表单
           if (fApi.value?.refreshValue) {
             fApi.value.refreshValue()
           }
+          // 再次清除无权限字段
+          clearNoEditFields(detailForm.value.value)
         })
       } else {
         // 使用form-create的API逐个设置字段值
-        Object.keys(formVariables).forEach(key => {
-          if (formVariables[key] !== undefined) {
+        Object.keys(editableVariables).forEach(key => {
+          if (editableVariables[key] !== undefined) {
             try {
-              fApi.value.setValue(key, formVariables[key])
+              fApi.value.setValue(key, editableVariables[key])
             } catch (e) {
               console.error(`设置字段 ${key} 失败:`, e)
             }
           }
         })
-        
+
         // 强制表单更新
         nextTick(() => {
           if (fApi.value?.refreshValue) {
             fApi.value.refreshValue()
           }
+          clearNoEditFields(detailForm.value.value)
         })
       }
     }
@@ -691,11 +731,7 @@ const getFormData = () => {
 // 暴露方法给父组件
 defineExpose({
   initProcessInfo,
-  fillFormVariables: (formVariables) => {
-    if (formVariables && Object.keys(formVariables).length > 0) {
-      detailForm.value.value = { ...detailForm.value.value, ...formVariables }
-    }
-  },
+  fillFormVariables,
   getFormData
 })
 </script>
