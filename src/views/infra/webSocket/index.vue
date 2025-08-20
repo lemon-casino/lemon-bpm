@@ -78,8 +78,11 @@ defineOptions({ name: 'InfraWebSocket' })
 
 const message = useMessage() // 消息弹窗
 
+const wsPrefix = import.meta.env.PROD
+  ? window.location.origin + (import.meta.env.NGINX_BASE_URL || '/baoxuan')
+  : import.meta.env.VITE_BASE_URL
 const server = ref(
-  (import.meta.env.VITE_BASE_URL + '/infra/ws').replace('http', 'ws') +
+  (wsPrefix + '/infra/ws').replace(/^http/, 'ws') +
     '?token=' +
     getRefreshToken() // 使用 getRefreshToken() 方法，而不使用 getAccessToken() 方法的原因：WebSocket 无法方便的刷新访问令牌
 ) // WebSocket 服务地址
