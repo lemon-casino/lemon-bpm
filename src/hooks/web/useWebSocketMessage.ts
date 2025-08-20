@@ -35,9 +35,13 @@ export interface MessageContent {
 export const useWebSocketMessage = () => {
   // 初始化用户store
   const userStore = useUserStore()
-  
+
   // WebSocket 连接
-  const wsUrl = (import.meta.env.VITE_BASE_URL + '/infra/ws').replace('http', 'ws') + 
+  const wsPrefix = import.meta.env.PROD
+    ? window.location.origin + (import.meta.env.NGINX_BASE_URL || '/baoxuan')
+    : import.meta.env.VITE_BASE_URL
+  const wsUrl =
+    (wsPrefix + '/infra/ws').replace(/^http/, 'ws') +
     '?token=' + getRefreshToken()
   
   const { data, status, send, open, close } = useWebSocket(wsUrl, {
