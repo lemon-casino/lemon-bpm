@@ -1616,6 +1616,50 @@ const expandSubformDataToColumns = (
   return result
 }
 
+/**
+ * 将子表单数据展开为多行，便于后续进行单元格合并
+ * @param baseRow 基础行数据
+ * @param formData 表单数据
+ * @param subformColumns 子表单列配置
+ * @returns 展开后的数据行数组
+ */
+const expandSubformDataToRows = (
+  baseRow: Record<string, any>,
+  formData: ProcessInstanceItem,
+  subformColumns: ColumnItem[]
+): Record<string, any>[] => {
+  const rows: Record<string, any>[] = []
+
+  if (!subformColumns || subformColumns.length === 0) {
+    rows.push({ ...baseRow })
+    return rows
+  }
+
+  let hasSubformData = false
+
+  subformColumns.forEach(column => {
+    const key = column.key
+    const subformData = getSubformData(formData, key)
+
+    if (subformData && subformData.length > 0) {
+      hasSubformData = true
+      subformData.forEach(subItem => {
+        const row = { ...baseRow }
+        Object.entries(subItem).forEach(([subKey, subValue]) => {
+          row[`${key}.${subKey}`] = subValue
+        })
+        rows.push(row)
+      })
+    }
+  })
+
+  if (!hasSubformData) {
+    rows.push({ ...baseRow })
+  }
+
+  return rows
+}
+
 /** 显示导出选项对话框 */
 const handleExportOptions = () => {
   exportOptionsVisible.value = true
@@ -1647,7 +1691,8 @@ const handleExport = async () => {
     }
 
     // 构建导出数据
-    let exportData: Record<string, any>[] = []
+    const exportData: Record<string, any>[] = []
+    const rowGroupCounts: number[] = []
 
     // 处理每一行数据
     list.value.forEach(item => {
@@ -1665,31 +1710,30 @@ const handleExport = async () => {
         '流程编号': item.id
       }
 
-      // 根据选择的子表单处理方式进行处
-
-
-        // 按列展开方式（columns-simple 或 columns-merged）
-        // 添加普通表单变量（非子表单字段）
-        visibleColumns.forEach(key => {
-          // 跳过子表单字段，它们会在expandSubformDataToColumns中处理
-          if (!subformColumns.some(col => col.key === key)) {
-            // {{ AURA-X: Modify - 修复导出时基础字段被覆盖的问题 }}
-            // 只有当baseRow中不存在该字段时，才从表单变量中获取
-            if (!(key in baseRow)) {
-              baseRow[key] = getRawValue(item, key)
-            }
+      // 添加普通表单变量（非子表单字段）
+      visibleColumns.forEach(key => {
+        if (!subformColumns.some(col => col.key === key)) {
+          if (!(key in baseRow)) {
+            baseRow[key] = getRawValue(item, key)
           }
-        })
+        }
+      })
 
-        // 使用按列展开处理函数处理子表单数据
-        // 如果是简洁表头模式，传入true
+      if (exportOptions.subformFormat === 'columns-merged') {
+        const rows = expandSubformDataToRows(baseRow, item, subformColumns)
+        exportData.push(...rows)
+        rowGroupCounts.push(rows.length)
+      } else {
         const useSimpleHeaders = exportOptions.subformFormat === 'columns-simple'
         const baseRowCopy = JSON.parse(JSON.stringify(baseRow))
-        // 使用拷贝的数据进行处理
-        const expandedRow = expandSubformDataToColumns(baseRowCopy, item, subformColumns, useSimpleHeaders)
-        // 将展开后的行添加到导出数据中
+        const expandedRow = expandSubformDataToColumns(
+          baseRowCopy,
+          item,
+          subformColumns,
+          useSimpleHeaders
+        )
         exportData.push(expandedRow)
-
+      }
     })
 
       try {
@@ -1699,7 +1743,7 @@ const handleExport = async () => {
         // 根据选择的格式创建工作表
         if (exportOptions.subformFormat === 'columns-merged') {
           // 带合并单元格的表格
-          worksheet = createMergedHeadersWorksheet(exportData, subformColumns)
+          worksheet = createMergedHeadersWorksheet(exportData, subformColumns, rowGroupCounts)
         } else {
           // 普通表格 - 确保所有单元格都有数据
           // 先处理数据，确保空值也被正确填充
@@ -2088,190 +2132,115 @@ const handleExport = async () => {
   }
 
   /**
-   * 创建带合并单元格的Excel工作表
-   * @param {Array} data 数据行数组
-   * @param {Array} subformColumns 子表单列配置
-   * @returns {Object} 工作表对象和合并信息
+   * 创建带合并单元格的Excel工作表（子表单按行展开）
+   * @param data 数据行数组
+   * @param subformColumns 子表单列配置
+   * @param rowGroupCounts 每组数据行数，用于垂直合并
    */
-  const createMergedHeadersWorksheet = (data: Record<string, any>[], subformColumns: ColumnItem[]) => {
-    // 如果没有数据，返回空工作表
+  const createMergedHeadersWorksheet = (
+    data: Record<string, any>[],
+    subformColumns: ColumnItem[],
+    rowGroupCounts: number[]
+  ) => {
     if (!data || data.length === 0) {
       return XLSX.utils.aoa_to_sheet([])
     }
 
-    // 获取第一行数据，用于提取列名
     const firstRow = data[0]
-
-    // 提取基础列（非子表单列）
     const baseColumns: string[] = []
-    // 提取子表单列及其子列，按父字段名和索引分组
-    const subformColumnGroups: Record<string, Record<number, Set<string>>> = {}
-
     Object.keys(firstRow).forEach(key => {
-      // 检查是否为子表单字段
-      const isSubformField = subformColumns.some(col => key.startsWith(col.key + '['))
-
-      if (!isSubformField) {
-        // 基础列
+      if (!key.includes('.')) {
         baseColumns.push(key)
-      } else {
-        // 子表单列，提取父字段名、索引和子字段名
-        // 格式：父字段名[索引].子字段名
-        const match = key.match(/^([^[]+)\[(\d+)\]\.(.+)$/)
-        if (match) {
-          const [, parentKey, indexStr, childKey] = match
-          const index = parseInt(indexStr)
-
-          // 初始化父字段名和索引对应的集合
-          if (!subformColumnGroups[parentKey]) {
-            subformColumnGroups[parentKey] = {}
-          }
-          if (!subformColumnGroups[parentKey][index]) {
-            subformColumnGroups[parentKey][index] = new Set()
-          }
-
-          // 添加子字段名
-          subformColumnGroups[parentKey][index].add(childKey)
-        }
       }
     })
 
-    // 将子表单列组转换为数组格式，按索引排序
-    const subformGroups = Object.entries(subformColumnGroups).map(([parentKey, indexGroups]) => ({
-      parentKey,
-      indices: Object.entries(indexGroups)
-        .map(([index, childKeys]) => ({ index: Number(index), childKeys: Array.from(childKeys) }))
-        .sort((a, b) => a.index - b.index)
+    const subformGroups = subformColumns.map(col => ({
+      parentKey: col.key,
+      childKeys: col.subColumns || []
     }))
 
-    // 创建表头行
-    const headerRow1: string[] = [] // 第一行表头（父字段名）
-    const headerRow2: string[] = [] // 第二行表头（子字段名）
-    const merges: XLSXRange[] = [] // 合并单元格信息
+    const headerRow1: string[] = []
+    const headerRow2: string[] = []
+    const merges: XLSXRange[] = []
 
-    // 添加基础列到表头
     baseColumns.forEach(col => {
       headerRow1.push(col)
-      headerRow2.push('') // 第二行对应位置留空
-
-      // 添加合并单元格信息（垂直合并）
-      merges.push({
-        s: { r: 0, c: headerRow1.length - 1 }, // 开始单元格
-        e: { r: 1, c: headerRow1.length - 1 }  // 结束单元格
-      })
+      headerRow2.push('')
+      merges.push({ s: { r: 0, c: headerRow1.length - 1 }, e: { r: 1, c: headerRow1.length - 1 } })
     })
 
-    // 添加子表单列到表头
     subformGroups.forEach(group => {
-      const { parentKey, indices } = group
-      indices.forEach(({ index, childKeys }) => {
-        const startCol = headerRow1.length
-        const parentHeader = indices.length > 1 ? `${parentKey}${index + 1}` : parentKey
-
-        // 添加父字段名到第一行
-        headerRow1.push(parentHeader)
-        // 为每个子字段名添加空白占位
-        for (let i = 1; i < childKeys.length; i++) {
-          headerRow1.push('')
-        }
-
-        // 添加子字段名到第二行
-        childKeys.forEach(childKey => {
-          headerRow2.push(childKey)
-        })
-
-        // 添加合并单元格信息（水平合并）
-        if (childKeys.length > 1) {
-          merges.push({
-            s: { r: 0, c: startCol }, // 开始单元格
-            e: { r: 0, c: startCol + childKeys.length - 1 } // 结束单元格
-          })
-        }
+      const startCol = headerRow1.length
+      headerRow1.push(group.parentKey)
+      for (let i = 1; i < group.childKeys.length; i++) {
+        headerRow1.push('')
+      }
+      group.childKeys.forEach(child => {
+        headerRow2.push(child)
       })
+      if (group.childKeys.length > 1) {
+        merges.push({ s: { r: 0, c: startCol }, e: { r: 0, c: startCol + group.childKeys.length - 1 } })
+      }
     })
 
-    // 创建数据行
     const dataRows = data.map(row => {
       const dataRow: any[] = []
-
-      // 添加基础列数据
-      baseColumns.forEach(col => {
-        dataRow.push(row[col])
-      })
-
-      // 添加子表单列数据
+      baseColumns.forEach(col => dataRow.push(row[col]))
       subformGroups.forEach(group => {
-        const { parentKey, indices } = group
-
-        indices.forEach(({ index, childKeys }) => {
-          childKeys.forEach(childKey => {
-            const key = `${parentKey}[${index}].${childKey}`
-            dataRow.push(row[key])
-          })
+        group.childKeys.forEach(child => {
+          const key = `${group.parentKey}.${child}`
+          dataRow.push(row[key])
         })
       })
-
       return dataRow
     })
 
-    // 合并表头和数据行
-    const allRows = [headerRow1, headerRow2, ...dataRows]
+    let rowOffset = 2
+    rowGroupCounts.forEach(count => {
+      if (count > 1) {
+        baseColumns.forEach((_, colIndex) => {
+          merges.push({ s: { r: rowOffset, c: colIndex }, e: { r: rowOffset + count - 1, c: colIndex } })
+        })
+      }
+      rowOffset += count
+    })
 
-    // 创建工作表
-    const worksheet = XLSX.utils.aoa_to_sheet(allRows)
-
-    // 添加合并单元格信息
+    const worksheet = XLSX.utils.aoa_to_sheet([headerRow1, headerRow2, ...dataRows])
     worksheet['!merges'] = merges
 
-    // 设置列宽
     const columnWidths = []
-
-    // 计算总列数
     const totalColumns = headerRow2.length
-
-    // 设置每列的宽度
     for (let i = 0; i < totalColumns; i++) {
-      let width = 15 // 默认宽度
-
-              // 获取当前列的表头
-        const header1 = headerRow1[i] || ''
-        const header2 = headerRow2[i] || ''
-
-          // 根据表头内容设置合适的宽度
-        if (i < baseColumns.length) {
-          // 基础列
-          if (header1 === '流程名称' || header1 === '流程编号') {
-            width = 40
-          } else if (header1 === '发起时间' || header1 === '结束时间') {
-            width = 20
-          } else if (header1 === '当前审批任务') {
-            width = 25
-          } else if (header1 === '流程分类' || header1 === '流程发起人' || header1 === '流程状态') {
-            width = 15
-          }
-        } else {
-          // 子表单列
-          if (header2.includes('天猫预计月销量') || header2.includes('淘工厂预计月销量')) {
-            width = 20
-          } else if (header2.includes('商品编码')) {
-            width = 25
-          } else {
-            // 根据表头长度动态设置
-            const headerLength = Math.max(header1.length, header2.length)
-            width = Math.max(headerLength * 1.8, 15)
-          }
+      let width = 15
+      const header1 = headerRow1[i] || ''
+      const header2 = headerRow2[i] || ''
+      if (i < baseColumns.length) {
+        if (header1 === '流程名称' || header1 === '流程编号') {
+          width = 40
+        } else if (header1 === '发起时间' || header1 === '结束时间') {
+          width = 20
+        } else if (header1 === '当前审批任务') {
+          width = 25
+        } else if (header1 === '流程分类' || header1 === '流程发起人' || header1 === '流程状态') {
+          width = 15
         }
-
-        columnWidths.push({ wch: width })
+      } else {
+        if (header2.includes('天猫预计月销量') || header2.includes('淘工厂预计月销量')) {
+          width = 20
+        } else if (header2.includes('商品编码')) {
+          width = 25
+        } else {
+          const headerLength = Math.max(header1.length, header2.length)
+          width = Math.max(headerLength * 1.8, 15)
+        }
       }
-
-      worksheet['!cols'] = columnWidths
-
-      // 添加边框样式 - 使用2作为headerRows参数，因为我们有两行表头
-      applyBordersToWorksheet(worksheet, 2)
-
-      return worksheet
+      columnWidths.push({ wch: width })
     }
+
+    worksheet['!cols'] = columnWidths
+    applyBordersToWorksheet(worksheet, 2)
+    return worksheet
+  }
 
     /**
      * 为工作表添加边框样式
