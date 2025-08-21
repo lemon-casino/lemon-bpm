@@ -1601,8 +1601,8 @@ const expandSubformDataToColumns = (
         // 根据选择的格式生成列名
         let columnName: string
         if (useSimpleHeaders) {
-          // 简洁格式：直接使用子字段名
-          columnName = subKey
+          // 简洁格式：子字段名 + 序号，避免同名字段覆盖
+          columnName = `${subKey}_${index + 1}`
         } else {
           // 带索引格式：父字段名[索引].子字段名
           columnName = `${key}[${index}].${subKey}`
@@ -2104,8 +2104,8 @@ const handleExport = async () => {
 
     // 提取基础列（非子表单列）
     const baseColumns: string[] = []
-    // 提取子表单列及其子列
-    const subformColumnGroups: Record<string, Set<string>> = {}
+    // 提取子表单列及其子列，按父字段名和索引分组
+    const subformColumnGroups: Record<string, Record<number, Set<string>>> = {}
 
     Object.keys(firstRow).forEach(key => {
       // 检查是否为子表单字段
@@ -2115,27 +2115,33 @@ const handleExport = async () => {
         // 基础列
         baseColumns.push(key)
       } else {
-        // 子表单列，提取父字段名和子字段名
+        // 子表单列，提取父字段名、索引和子字段名
         // 格式：父字段名[索引].子字段名
-        const match = key.match(/^([^[]+)\[\d+\]\.(.+)$/)
+        const match = key.match(/^([^[]+)\[(\d+)\]\.(.+)$/)
         if (match) {
-          const [, parentKey, childKey] = match
+          const [, parentKey, indexStr, childKey] = match
+          const index = parseInt(indexStr)
 
-          // 初始化子表单列组
+          // 初始化父字段名和索引对应的集合
           if (!subformColumnGroups[parentKey]) {
-            subformColumnGroups[parentKey] = new Set()
+            subformColumnGroups[parentKey] = {}
+          }
+          if (!subformColumnGroups[parentKey][index]) {
+            subformColumnGroups[parentKey][index] = new Set()
           }
 
           // 添加子字段名
-          subformColumnGroups[parentKey].add(childKey)
+          subformColumnGroups[parentKey][index].add(childKey)
         }
       }
     })
 
-    // 将子表单列组转换为数组格式
-    const subformGroups = Object.entries(subformColumnGroups).map(([parentKey, childKeys]) => ({
+    // 将子表单列组转换为数组格式，按索引排序
+    const subformGroups = Object.entries(subformColumnGroups).map(([parentKey, indexGroups]) => ({
       parentKey,
-      childKeys: Array.from(childKeys)
+      indices: Object.entries(indexGroups)
+        .map(([index, childKeys]) => ({ index: Number(index), childKeys: Array.from(childKeys) }))
+        .sort((a, b) => a.index - b.index)
     }))
 
     // 创建表头行
@@ -2157,28 +2163,31 @@ const handleExport = async () => {
 
     // 添加子表单列到表头
     subformGroups.forEach(group => {
-      const { parentKey, childKeys } = group
-      const startCol = headerRow1.length
+      const { parentKey, indices } = group
+      indices.forEach(({ index, childKeys }) => {
+        const startCol = headerRow1.length
+        const parentHeader = indices.length > 1 ? `${parentKey}${index + 1}` : parentKey
 
-      // 添加父字段名到第一行
-      headerRow1.push(parentKey)
-      // 为每个子字段名添加空白占位
-      for (let i = 1; i < childKeys.length; i++) {
-        headerRow1.push('')
-      }
+        // 添加父字段名到第一行
+        headerRow1.push(parentHeader)
+        // 为每个子字段名添加空白占位
+        for (let i = 1; i < childKeys.length; i++) {
+          headerRow1.push('')
+        }
 
-      // 添加子字段名到第二行
-      childKeys.forEach(childKey => {
-        headerRow2.push(childKey)
-      })
-
-      // 添加合并单元格信息（水平合并）
-      if (childKeys.length > 1) {
-        merges.push({
-          s: { r: 0, c: startCol }, // 开始单元格
-          e: { r: 0, c: startCol + childKeys.length - 1 } // 结束单元格
+        // 添加子字段名到第二行
+        childKeys.forEach(childKey => {
+          headerRow2.push(childKey)
         })
-      }
+
+        // 添加合并单元格信息（水平合并）
+        if (childKeys.length > 1) {
+          merges.push({
+            s: { r: 0, c: startCol }, // 开始单元格
+            e: { r: 0, c: startCol + childKeys.length - 1 } // 结束单元格
+          })
+        }
+      })
     })
 
     // 创建数据行
@@ -2192,20 +2201,13 @@ const handleExport = async () => {
 
       // 添加子表单列数据
       subformGroups.forEach(group => {
-        const { parentKey, childKeys } = group
+        const { parentKey, indices } = group
 
-        // 遍历子字段名
-        childKeys.forEach(childKey => {
-          // 查找对应的数据
-          // 由于原始数据格式为 parentKey[index].childKey，需要查找匹配的键
-          let value = null
-          Object.entries(row).forEach(([key, val]) => {
-            if (key.startsWith(`${parentKey}[`) && key.endsWith(`.${childKey}`)) {
-              value = val
-            }
+        indices.forEach(({ index, childKeys }) => {
+          childKeys.forEach(childKey => {
+            const key = `${parentKey}[${index}].${childKey}`
+            dataRow.push(row[key])
           })
-
-          dataRow.push(value)
         })
       })
 
