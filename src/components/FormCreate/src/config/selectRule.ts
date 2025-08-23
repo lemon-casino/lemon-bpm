@@ -182,6 +182,17 @@ const apiSelectRule = [
     field: 'remoteField',
     title: '请求参数',
     info: '远程请求时请求携带的参数名称，如：name'
+  },
+  {
+    type: 'input',
+    field: 'linkField',
+    title: '联动字段',
+    info: 'JSON 格式，键为接口字段，值为表单字段，如 {"atmCard":"Fpfomejppi8rakc"}',
+    props: {
+      type: 'textarea',
+      autosize: true,
+      placeholder: '{"接口字段":"表单字段"}'
+    }
   }
 ]
 

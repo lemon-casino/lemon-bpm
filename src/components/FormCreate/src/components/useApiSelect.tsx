@@ -285,6 +285,16 @@ export const useApiSelect = (option: ApiSelectProps) => {
       remoteField: {
         type: String,
         default: 'label'
+      },
+      // 联动字段映射
+      linkField: {
+        type: String,
+        default: ''
+      },
+      // form-create 注入对象
+      formCreateInject: {
+        type: Object,
+        default: null
       }
     },
     setup(props) {
@@ -627,7 +637,16 @@ export const useApiSelect = (option: ApiSelectProps) => {
       function parseOptions(data: any) {
         //  情况一：如果有自定义解析函数优先使用自定义解析
         if (!isEmpty(props.parseFunc)) {
-          options.value = parseFunc()?.(data)
+          const parsed = parseFunc()?.(data)
+          if (Array.isArray(parsed)) {
+            // 兼容自定义解析函数未返回原始数据的情况
+            options.value = parsed.map((opt: any) => ({
+              ...opt,
+              raw: opt.raw ?? opt
+            }))
+          } else {
+            options.value = parsed
+          }
           return
         }
 
@@ -657,7 +676,8 @@ export const useApiSelect = (option: ApiSelectProps) => {
         if (Array.isArray(data)) {
           options.value = data.map((item: any) => ({
             label: parseExpression(item, props.labelField),
-            value: parseExpression(item, props.valueField)
+            value: parseExpression(item, props.valueField),
+            raw: item
           }))
           return
         }
@@ -712,7 +732,42 @@ export const useApiSelect = (option: ApiSelectProps) => {
           queryParam.value = query
           await getOptions()
         } finally {
-          loading.value = false
+      loading.value = false
+        }
+      }
+
+      // 触发 change 事件时，额外返回选中项的原始数据
+      const applyLinkField = (raw: any | any[]) => {
+        if (!props.linkField || !props.formCreateInject) return
+        const map = jsonParse(props.linkField) || {}
+        const api = props.formCreateInject.api || props.formCreateInject.fapi
+        if (!api || typeof map !== 'object') return
+        Object.entries(map).forEach(([source, target]) => {
+          if (Array.isArray(raw)) {
+            const values = raw
+              .map((item) => item && item[source])
+              .filter((v) => v !== undefined)
+            api.setValue && api.setValue(target as string, values)
+          } else if (raw && raw[source] !== undefined) {
+            api.setValue && api.setValue(target as string, raw[source])
+          }
+        })
+      }
+
+      const triggerChange = (val: any) => {
+        const handler = (attrs as any).onChange
+
+        const findItem = (v: any) =>
+          options.value.find((item) => String(item.value) === String(v))
+
+        if (props.multiple && Array.isArray(val)) {
+          const rows = val.map((v) => findItem(v)?.raw)
+          applyLinkField(rows)
+          handler && handler(val, rows)
+        } else {
+          const row = findItem(val)?.raw
+          applyLinkField(row)
+          handler && handler(val, row)
         }
       }
 
@@ -1009,6 +1064,7 @@ export const useApiSelect = (option: ApiSelectProps) => {
               remote={props.remote}
               {...(props.remote && { remoteMethod: remoteMethod })}
               value-key="value"
+              onChange={triggerChange}
             >
               {{
                 default: () => uniqueOptions.map((item, index) => {
@@ -1051,6 +1107,7 @@ export const useApiSelect = (option: ApiSelectProps) => {
             remote={props.remote}
             {...(props.remote && { remoteMethod: remoteMethod })}
             value-key="value"
+            onChange={triggerChange}
           >
             {{
               default: () => uniqueOptions.map((item, index) => {
@@ -1090,7 +1147,7 @@ export const useApiSelect = (option: ApiSelectProps) => {
           ]
         }
         return (
-          <el-checkbox-group class="w-full" {...attrs}>
+          <el-checkbox-group class="w-full" {...attrs} onChange={triggerChange}>
             {options.value.map((item, index) => (
               <el-checkbox key={index} label={item.value}>
                 {item.label}
@@ -1107,7 +1164,7 @@ export const useApiSelect = (option: ApiSelectProps) => {
           ]
         }
         return (
-          <el-radio-group class="w-full" {...attrs}>
+          <el-radio-group class="w-full" {...attrs} onChange={triggerChange}>
             {options.value.map((item, index) => (
               <el-radio key={index} value={item.value}>
                 {item.label}
