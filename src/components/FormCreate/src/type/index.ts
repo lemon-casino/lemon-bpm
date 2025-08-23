@@ -41,6 +41,7 @@ export interface ApiSelectProps {
   isDict?: boolean // 是否字典选择器
   method?: string // 请求方法
   params?: Record<string, any> // 请求参数
+  linkField?: string // 联动字段映射 JSON
 }
 
 // 选择组件规则配置类型
