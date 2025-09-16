@@ -8,9 +8,13 @@
         <span>我的流程</span>
       </div>
       <div class="card-action">
-        <el-button type="primary" @click="handleCreateProcess">
+        <el-button type="success" @click="refreshAllData" :loading="refreshing" class="header-btn">
+          <Icon icon="ep:refresh" class="mr-5px" />
+          <span class="btn-text">刷新数据</span>
+        </el-button>
+        <el-button type="primary" @click="handleCreateProcess" class="header-btn">
           <Icon icon="ep:plus" class="mr-5px" />
-          发起流程
+          <span class="btn-text">发起流程</span>
         </el-button>
       </div>
     </div>
@@ -146,11 +150,11 @@
       
       <!-- 增大高度的表格容器 -->
       <div class="expanded-table-container">
-        <!-- 流程列表 -->
+        <!-- 桌面端表格视图 -->
         <el-table 
           v-loading="loading" 
           :data="list" 
-          class="bpm-table"
+          class="bmp-table desktop-table"
           :header-cell-style="{
             background: 'var(--el-fill-color-light)',
             color: 'var(--el-text-color-primary)',
@@ -231,6 +235,45 @@
               <dict-tag :type="DICT_TYPE.BPM_PROCESS_INSTANCE_STATUS" :value="scope.row.status" />
             </template>
           </el-table-column>
+          <el-table-column label="运行节点" prop="tasks" width="140" align="center">
+            <template #default="scope">
+              <div v-if="scope.row.tasks && scope.row.tasks.length > 0">
+                <!-- 如果只有一个任务，直接显示 -->
+                <div v-if="scope.row.tasks.length === 1" class="task-single">
+                  <el-tag type="warning" effect="plain" size="small">
+                    {{ scope.row.tasks[0].name }}
+                  </el-tag>
+                </div>
+                <!-- 如果有多个任务，显示第一个+更多 -->
+                <div v-else class="task-multiple">
+                  <el-tag type="warning" effect="plain" size="small" class="mb-2px">
+                    {{ scope.row.tasks[0].name }}
+                  </el-tag>
+                  <el-popover
+                    placement="bottom-start"
+                    :width="250"
+                    trigger="hover"
+                  >
+                    <template #reference>
+                      <div class="more-tasks">
+                        <el-link type="warning" :underline="false">
+                          <small>+{{ scope.row.tasks.length - 1 }}个</small>
+                        </el-link>
+                      </div>
+                    </template>
+                    <div class="tasks-popover">
+                      <div v-for="task in scope.row.tasks" :key="task.id" class="mb-5px">
+                        <el-tag type="warning" effect="plain" size="small">
+                          {{ task.name }}
+                        </el-tag>
+                      </div>
+                    </div>
+                  </el-popover>
+                </div>
+              </div>
+              <span v-else class="text-placeholder">-</span>
+            </template>
+          </el-table-column>
           
           <el-table-column
             label="发起时间"
@@ -298,13 +341,138 @@
           </el-table-column>
         </el-table>
         
+        <!-- 移动端卡片视图 -->
+        <div v-loading="loading" class="mobile-card-view">
+          <div v-for="item in list" :key="item.id" class="process-card">
+            <!-- 卡片头部 -->
+            <div class="card-header">
+              <div class="process-name">
+                <Icon icon="ep:connection" class="process-icon" />
+                <span class="name-text">{{ item.name }}</span>
+              </div>
+              <dict-tag :type="DICT_TYPE.BPM_PROCESS_INSTANCE_STATUS" :value="item.status" />
+            </div>
+            
+            <!-- 卡片内容 -->
+            <div class="card-content">
+              <!-- 摘要信息 -->
+              <div v-if="item.summary && item.summary.length > 0" class="summary-section">
+                <div class="section-title">摘要信息</div>
+                <div class="summary-list">
+                  <div v-for="(summary, index) in item.summary.slice(0, 2)" :key="index" class="summary-item-mobile">
+                    <el-tag size="small" type="info">{{ summary.key }}</el-tag>
+                    <span class="summary-value-mobile">{{ summary.value }}</span>
+                  </div>
+                  <div v-if="item.summary.length > 2" class="more-summary-mobile">
+                    <el-button text type="primary" size="small" @click="showMoreSummary(item)">
+                      查看更多 (+{{ item.summary.length - 2 }}项)
+                    </el-button>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- 基本信息 -->
+              <div class="info-section">
+                <div class="info-row">
+                  <span class="info-label">流程分类:</span>
+                  <el-tag type="success" effect="plain" size="small">{{ item.categoryName }}</el-tag>
+                </div>
+                <!-- 运行节点信息 -->
+                <div v-if="item.tasks && item.tasks.length > 0" class="info-row">
+                  <span class="info-label">运行节点:</span>
+                  <div class="running-tasks-mobile">
+                    <!-- 如果只有一个任务 -->
+                    <el-tag v-if="item.tasks.length === 1" type="warning" effect="plain" size="small">
+                      {{ item.tasks[0].name }}
+                    </el-tag>
+                    <!-- 如果有多个任务 -->
+                    <div v-else class="multiple-tasks-mobile">
+                      <el-tag type="warning" effect="plain" size="small" class="mr-5px">
+                        {{ item.tasks[0].name }}
+                      </el-tag>
+                      <el-button text type="warning" size="small" @click="showMoreTasks(item)">
+                        +{{ item.tasks.length - 1 }}个
+                      </el-button>
+                    </div>
+                  </div>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">发起时间:</span>
+                  <span class="info-value">{{ dateFormatter(null, null, item.startTime) }}</span>
+                </div>
+                <div v-if="item.endTime" class="info-row">
+                  <span class="info-label">结束时间:</span>
+                  <span class="info-value">{{ dateFormatter(null, null, item.endTime) }}</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 卡片操作 -->
+            <div class="card-actions">
+              <!-- 详情按钮 -->
+              <el-button
+                size="small"
+                type="primary"
+                v-hasPermi="['bpm:process-instance:query']"
+                @click="handleDetail(item)"
+              >
+                详情
+              </el-button>
+              
+              <!-- 运行中的流程显示取消按钮 -->
+              <el-button
+                v-if="item.status === 1"
+                size="small"
+                :type="cancelLoadingId === item.id ? 'info' : 'warning'"
+                v-hasPermi="['bpm:process-instance:cancel']"
+                @click="handleCancel(item)"
+                :loading="cancelLoadingId === item.id"
+              >
+                取消
+              </el-button>
+              
+              <!-- 已完成/已取消/已拒绝的流程显示删除按钮 -->
+              <el-button 
+                v-if="item.status === 2 || item.status === 3 || item.status === 4"
+                size="small"
+                type="danger" 
+                v-hasPermi="['bpm:process-instance:delete']"
+                @click="handleDelete(item)"
+                :loading="deleteLoadingId === item.id"
+              >
+                删除
+              </el-button>
+              
+              <!-- 已完成/已取消/已拒绝的流程显示重新发起按钮 -->
+              <el-button 
+                v-if="item.status === 2 || item.status === 3 || item.status === 4"
+                size="small"
+                type="success"
+                @click="handleCreate(item)"
+              >
+                重新发起
+              </el-button>
+            </div>
+          </div>
+          
+          <!-- 移动端空状态 -->
+          <div v-if="list.length === 0 && !loading" class="mobile-empty">
+            <Icon icon="ep:document" class="empty-icon" />
+            <p>暂无流程数据</p>
+          </div>
+        </div>
+        
         <!-- 分页 -->
         <div class="pagination-container">
           <Pagination
             :total="total"
             v-model:page="queryParams.pageNo"
             v-model:limit="queryParams.pageSize"
+            :pagerCount="4"
             @pagination="getList"
+            :small="isMobile"
+            :hide-on-single-page="false"
+            class="mobile-pagination"
           />
         </div>
       </div>
@@ -354,6 +522,9 @@ const queryFormRef = ref() // 搜索的表单
 const categoryList = ref<CategoryVO[]>([]) // 流程分类列表
 const showAdvancedFilter = ref(false) // 是否显示高级筛选
 
+// 移动端检测
+const isMobile = ref(false)
+
 // 流程统计数据
 const stats = reactive({
   running: 0,
@@ -361,6 +532,11 @@ const stats = reactive({
   canceled: 0,
   error: 0
 })
+
+// 检测屏幕尺寸
+const checkMobile = () => {
+  isMobile.value = window.innerWidth <= 768
+}
 
 /** 统一数据刷新函数 */
 const refreshAllData = async (showLoading = true) => {
@@ -546,14 +722,44 @@ const getCategoryList = async () => {
   categoryList.value = await CategoryApi.getCategorySimpleList()
 }
 
-/** 页面激活时刷新数据 */
+/** 显示更多摘要信息 */
+const showMoreSummary = (item: ProcessInstanceVO) => {
+  ElMessageBox.alert(
+    item.summary?.map(s => `${s.key}: ${s.value}`).join('\n') || '暂无摘要信息',
+    '完整摘要信息',
+    {
+      confirmButtonText: '确定',
+      customClass: 'summary-dialog'
+    }
+  )
+}
+
+/** 显示更多运行节点信息 */
+const showMoreTasks = (item: ProcessInstanceVO) => {
+  ElMessageBox.alert(
+    item.tasks?.map(task => task.name).join('\n') || '暂无运行节点信息',
+    '所有运行节点',
+    {
+      confirmButtonText: '确定',
+      customClass: 'tasks-dialog'
+    }
+  )
+}
+
+/** 页面激活时不再自动刷新数据
 onActivated(() => {
-  refreshAllData()
-})
+  // 移除自动刷新，改为手动刷新
+})*/
 
 /** 初始化 */
 onMounted(async () => {
+  checkMobile()
+  window.addEventListener('resize', checkMobile)
   await refreshAllData()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', checkMobile)
 })
 </script>
 
@@ -577,6 +783,64 @@ onMounted(async () => {
     display: flex;
     flex-direction: column;
   }
+  
+  /* 移动端适配 */
+  @media (max-width: 768px) {
+    height: calc(100vh - 80px); /* 移动端减少顶部空间 */
+    
+    .bpm-card-body {
+      padding: 0 8px; /* 移动端减少左右padding */
+    }
+  }
+  
+  @media (max-width: 480px) {
+    height: calc(100vh - 60px); /* 小屏幕进一步优化 */
+    
+    .bpm-card-body {
+      padding: 0 4px;
+    }
+  }
+}
+
+/* 卡片头部样式 */
+.bpm-card-header {
+  .card-action {
+    display: flex;
+    gap: 8px;
+    
+    .header-btn {
+      display: flex;
+      align-items: center;
+      
+      .btn-text {
+        display: inline;
+      }
+    }
+    
+    /* 移动端头部适配 */
+    @media (max-width: 768px) {
+      gap: 6px;
+      
+      .header-btn {
+        padding: 8px 12px;
+        
+        .btn-text {
+          display: none; /* 移动端隐藏按钮文字，只显示图标 */
+        }
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .header-btn {
+        padding: 6px 10px;
+        min-width: 40px;
+        
+        .mr-5px {
+          margin-right: 0 !important;
+        }
+      }
+    }
+  }
 }
 
 /* 美化状态卡片 */
@@ -585,6 +849,16 @@ onMounted(async () => {
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   margin-bottom: 16px;
+  
+  /* 移动端适配 */
+  @media (max-width: 768px) {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  
+  @media (max-width: 480px) {
+    gap: 8px;
+  }
   
   .stat-card {
     position: relative;
@@ -742,6 +1016,57 @@ onMounted(async () => {
     padding-left: 16px;
     padding-right: 16px;
   }
+  
+  /* 移动端搜索栏适配 */
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+    padding: 16px;
+    
+    .search-left {
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+    }
+    
+    .search-right {
+      justify-content: center;
+      width: 100%;
+      flex-wrap: wrap;
+    }
+    
+    .search-input {
+      width: 100%;
+    }
+    
+    .filter-select {
+      width: 100%;
+    }
+    
+    .action-button {
+      flex: 1;
+      min-width: 80px;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    padding: 12px;
+    gap: 12px;
+    
+    .search-left {
+      gap: 10px;
+    }
+    
+    .search-right {
+      gap: 8px;
+    }
+    
+    .action-button {
+      padding: 8px 12px;
+      font-size: 14px;
+    }
+  }
 }
 
 /* 高级筛选面板 */
@@ -791,12 +1116,39 @@ onMounted(async () => {
     padding: 12px 0;
     padding-top: 0px;
     padding-bottom: 0px;
-
     background-color: var(--el-bg-color);
     border-top: 1px solid var(--border-color-light);
     z-index: 10;
     display: flex;
     justify-content: flex-end;
+  }
+  
+  /* 桌面端表格显示，移动端隐藏 */
+  .desktop-table {
+    display: table;
+  }
+  
+  /* 移动端卡片视图隐藏，桌面端显示 */
+  .mobile-card-view {
+    display: none;
+  }
+  
+  /* 移动端适配 */
+  @media (max-width: 768px) {
+    .desktop-table {
+      display: none;
+    }
+    
+    .mobile-card-view {
+      display: block;
+      flex: 1;
+      padding: 0 4px;
+    }
+    
+    .pagination-container {
+      justify-content: center;
+      padding: 16px 0;
+    }
   }
 }
 
@@ -870,6 +1222,227 @@ onMounted(async () => {
   .field-content {
     flex: 1;
   }
+}
+
+/* 移动端卡片样式 */
+.process-card {
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 12px;
+  margin-bottom: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  
+  &:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    transform: translateY(-2px);
+  }
+  
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    background: var(--el-fill-color-extra-light);
+    border-bottom: 1px solid var(--el-border-color-lighter);
+    
+    .process-name {
+      display: flex;
+      align-items: center;
+      flex: 1;
+      min-width: 0;
+      
+      .process-icon {
+        color: var(--el-color-primary);
+        font-size: 18px;
+        margin-right: 8px;
+        flex-shrink: 0;
+      }
+      
+      .name-text {
+        font-weight: 600;
+        font-size: 16px;
+        color: var(--el-text-color-primary);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
+  }
+  
+  .card-content {
+    padding: 16px;
+    
+    .summary-section {
+      margin-bottom: 16px;
+      
+      .section-title {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--el-text-color-regular);
+        margin-bottom: 8px;
+      }
+      
+      .summary-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        
+        .summary-item-mobile {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          
+          .summary-value-mobile {
+            flex: 1;
+            font-size: 14px;
+            color: var(--el-text-color-primary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+        }
+        
+        .more-summary-mobile {
+          margin-top: 4px;
+        }
+      }
+    }
+    
+    .info-section {
+      .info-row {
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
+        
+        &:last-child {
+          margin-bottom: 0;
+        }
+        
+        .info-label {
+          font-size: 14px;
+          color: var(--el-text-color-regular);
+          margin-right: 8px;
+          min-width: 70px;
+          flex-shrink: 0;
+        }
+        
+        .info-value {
+          font-size: 14px;
+          color: var(--el-text-color-primary);
+          flex: 1;
+        }
+      }
+    }
+  }
+  
+  .card-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--el-fill-color-extra-light);
+    border-top: 1px solid var(--el-border-color-lighter);
+    gap: 8px;
+    flex-wrap: wrap;
+    
+    .el-button {
+      margin: 0;
+    }
+    
+    @media (max-width: 480px) {
+      justify-content: center;
+      
+      .el-button {
+        flex: 1;
+        max-width: 80px;
+      }
+    }
+  }
+}
+
+.mobile-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: var(--el-text-color-placeholder);
+  
+  .empty-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.6;
+  }
+  
+  p {
+    font-size: 16px;
+    margin: 0;
+  }
+}
+
+/* 摘要对话框样式 */
+:deep(.summary-dialog) {
+  .el-message-box__content {
+    white-space: pre-line;
+    text-align: left;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+}
+
+/* 运行节点对话框样式 */
+:deep(.tasks-dialog) {
+  .el-message-box__content {
+    white-space: pre-line;
+    text-align: left;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+}
+
+/* 桌面端运行节点样式 */
+.task-single {
+  display: flex;
+  justify-content: center;
+}
+
+.task-multiple {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  
+  .more-tasks {
+    font-size: 12px;
+    text-align: center;
+  }
+}
+
+.tasks-popover {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+/* 移动端运行节点样式 */
+.running-tasks-mobile {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  
+  .multiple-tasks-mobile {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+}
+
+.text-placeholder {
+  color: var(--el-text-color-placeholder);
+  font-style: italic;
 }
 
 /* 动画 */

@@ -2,7 +2,7 @@ import * as FileApi from '@/api/infra/file'
 import CryptoJS from 'crypto-js'
 import { UploadRawFile, UploadRequestOptions } from 'element-plus/es/components/upload/src/upload'
 import axios from 'axios'
-import { getAccessToken, getTenantId } from '@/utils/auth'
+import { getAccessToken } from '@/utils/auth'
 import { config } from '@/config/axios/config'
 import { getTokenExpiresTime, isTokenExpired, refreshTokenProactively } from '@/utils/tokenManager'
 import { useMessage } from '@/hooks/web/useMessage'
@@ -110,8 +110,8 @@ export const useUpload = () => {
         // 创建专用的上传请求，使用较长的超时时间
         uploadFileWithLongTimeout({ file: options.file })
           .then((response) => {
-            // 提取data属性
-            const res = response.data
+            // request.upload 返回的是服务器响应的 data 部分，即 { code: 0, data: "url", msg: "" }
+            const res = response
             if (res.code === 0) {
               resolve(res)
             } else {
@@ -184,50 +184,9 @@ async function generateFileName(file: UploadRawFile) {
  * @param data 上传数据
  */
 function uploadFileWithLongTimeout(data: any) {
-  // 创建自定义axios实例用于文件上传，设置较长的超时时间
-  const uploadInstance = axios.create({
-    // 使用config中的base_url，以便正确处理NGINX_BASE_URL前缀
-    baseURL: config.base_url,
-    timeout: UPLOAD_TIMEOUT, // 使用较长的超时时间
-    headers: {
-      'Content-Type': 'multipart/form-data'
-    }
-  })
-  
-  // 直接从auth工具获取认证信息
-  const accessToken = getAccessToken()
-  const tenantId = getTenantId()
-  
-  // 设置认证头
-  if (accessToken) {
-    uploadInstance.defaults.headers.common['Authorization'] = 'Bearer ' + accessToken
-    console.log('设置认证头:', 'Bearer ' + accessToken.substring(0, 10) + '...')
-  } else {
-    console.warn('警告: 未找到访问令牌，上传可能失败')
-  }
-  
-  // 设置租户ID
-  if (tenantId) {
-    uploadInstance.defaults.headers.common['tenant-id'] = tenantId
-  }
-  
-  // 创建FormData
-  const formData = new FormData()
-  formData.append('file', data.file)
-  
-  // 发送请求，添加上传进度处理
-  return uploadInstance.post('/infra/file/upload', formData, {
-    onUploadProgress: (progressEvent) => {
-      if (progressEvent.total) {
-        // 计算上传百分比
-        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
-        console.log(`上传进度: ${percentCompleted}%`)
-        
-        // 这里可以通过事件总线或其他方式通知组件更新进度条
-        // 我们暂时不实现该功能，但为未来扩展预留接口
-      }
-    }
-  })
+  // 使用 FileApi.updateFile 方法进行文件上传
+  // 该方法已经包含了认证信息和超时设置
+  return FileApi.updateFile(data)
 }
 
 /**
@@ -243,11 +202,10 @@ enum UPLOAD_TYPE {
 /**
  * 统一处理上传错误
  * @param error 错误对象
- * @param file 文件对象
  * @param onRetry 重试回调函数
  * @returns 是否已处理成功
  */
-export const handleUploadError = async (error: any, file: any, onRetry: () => void): Promise<boolean> => {
+export const handleUploadError = async (error: any, onRetry: () => void): Promise<boolean> => {
   const message = useMessage()
   // 获取具体错误信息
   let errorMsg = '上传失败，请重试！'

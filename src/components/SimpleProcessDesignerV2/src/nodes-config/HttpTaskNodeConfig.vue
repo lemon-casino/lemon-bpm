@@ -31,9 +31,9 @@
         
         <!-- 系统任务相关配置 -->
         <template v-if="configForm.systemTask">
-          <el-form-item label="流程模型编号" prop="modelId">
+          <el-form-item label="流程模型编号" prop="modelKey">
             <el-select 
-              v-model="configForm.modelId" 
+              v-model="configForm.modelKey" 
               placeholder="请选择流程模型"
               filterable
               clearable
@@ -42,9 +42,9 @@
             >
               <el-option 
                 v-for="item in modelOptions" 
-                :key="item.id" 
+                :key="item.key"
                 :label="item.formName" 
-                :value="item.id" 
+                :value="item.key"
               />
             </el-select>
           </el-form-item>
@@ -116,7 +116,7 @@
                   trigger: 'blur'
                 }"
               >
-                <div v-if="configForm.systemTask && configForm.modelId" class="flex items-center">
+                <div v-if="configForm.systemTask && configForm.modelKey" class="flex items-center">
                   <el-select class="w-100px mr-2" v-model="item.type">
                     <el-option
                       v-for="types in BPM_HTTP_REQUEST_PARAM_TYPES"
@@ -241,13 +241,13 @@ const { userOptions } = useNodeForm(NodeType.HTTP_TASK_NODE)
 const formRules = reactive({
   url: [{ required: true, message: '请求地址不能为空', trigger: 'blur' }],
   method: [{ required: true, message: '请求方法不能为空', trigger: 'change' }],
-  modelId: [{ required: true, message: '流程模型编号不能为空', trigger: 'change' }],
+  modelKey: [{ required: true, message: '流程模型编号不能为空', trigger: 'change' }],
   refreshId: [] // 系统任务发起人编号非必填
 })
 // HTTP任务配置表单数据
 const configForm = ref<HttpRequestSetting & { modelName?: string }>({
   systemTask: false,
-  modelId: '',
+  modelKey: '',
   modelName: '',
   refreshId: '',
   method: BpmHttpRequestMethodEnum.POST,
@@ -296,9 +296,9 @@ const loadModelOptions = async () => {
       return
     }
     
-    // 如果已有选中的modelId，查找对应的modelName
-    if (configForm.value.modelId) {
-      const selectedModel = modelOptions.value.find(item => item.id === configForm.value.modelId)
+    // 如果已有选中的modelKey，查找对应的modelName
+    if (configForm.value.modelKey) {
+      const selectedModel = modelOptions.value.find(item => item.id === configForm.value.modelKey)
       if (selectedModel) {
         configForm.value.modelName = selectedModel.formName
       }
@@ -313,11 +313,11 @@ const loadModelOptions = async () => {
 }
 
 // 获取流程定义表单字段
-const getProcessDefinitionFormFields = async (modelId: string) => {
-  if (!modelId) return
+const getProcessDefinitionFormFields = async (modelKey: string) => {
+  if (!modelKey) return
   
   try {
-    const result = await request.get({ url: `/bpm/process-definition/form-fields?id=${modelId}` })
+    const result = await request.get({ url: `/bpm/process-definition/form-fields?key=${modelKey}` })
     console.log('获取流程表单字段结果:', result)
     
     // 处理API直接返回数组的情况
@@ -355,17 +355,17 @@ const getProcessDefinitionFormFields = async (modelId: string) => {
 const isLoadingFormFields = ref(false) // 防止重复请求的标记
 
 watch(
-  () => [configForm.value.systemTask, configForm.value.modelId],
-  async ([systemTask, modelId]) => {
+  () => [configForm.value.systemTask, configForm.value.modelKey],
+  async ([systemTask, modelKey]) => {
     // 如果正在加载中，则不重复请求
     if (isLoadingFormFields.value) {
       return
     }
     
-    if (systemTask && modelId) {
+    if (systemTask && modelKey) {
       isLoadingFormFields.value = true
       try {
-        await getProcessDefinitionFormFields(modelId as string)
+        await getProcessDefinitionFormFields(modelKey as string)
       } finally {
         isLoadingFormFields.value = false
       }
@@ -423,7 +423,7 @@ const checkFieldExists = (field: string) => {
 // 处理输入变化
 const onInputChange = (item: any) => {
   // 如果是系统任务并且有模型ID
-  if (configForm.value.systemTask && configForm.value.modelId) {
+  if (configForm.value.systemTask && configForm.value.modelKey) {
     // 检查输入的key是否匹配表单字段
     if (!checkFieldExists(item.key)) {
       // 如果不匹配，将类型设置为固定值
@@ -441,17 +441,16 @@ const saveConfig = async () => {
   if (configForm.value.systemTask) {
     formRules.url = []
     formRules.method = []
-    formRules.modelId = [{ required: true, message: '流程模型编号不能为空', trigger: 'change' }]
+    formRules.modelKey = [{ required: true, message: '流程模型编号不能为空', trigger: 'change' }]
   } else {
     formRules.url = [{ required: true, message: '请求地址不能为空', trigger: 'blur' }]
     formRules.method = [{ required: true, message: '请求方法不能为空', trigger: 'change' }]
-    formRules.modelId = []
+    formRules.modelKey = []
   }
   
   // 调试信息：打印当前请求体和请求头数据
   console.log('保存前请求头数据:', JSON.stringify(configForm.value.header))
   console.log('保存前请求体数据:', JSON.stringify(configForm.value.body))
-  
   try {
     // 首先验证HttpRequestParamSetting组件
     const paramValid = await httpParamSettingRef.value.validate()
@@ -485,7 +484,7 @@ const saveConfig = async () => {
   // 创建新对象保存配置，避免引用问题
   currentNode.value.httpRequestSetting = {
     systemTask: configForm.value.systemTask,
-    modelId: configForm.value.modelId,
+    modelKey: configForm.value.modelKey,
     modelName: configForm.value.modelName,
     refreshId: configForm.value.refreshId,
     method: configForm.value.method,
@@ -503,8 +502,17 @@ const saveConfig = async () => {
 const getShowText = (): string => {
   let showText = ''
   if (configForm.value.systemTask) {
-    // 使用modelName(formName)显示，如果没有则使用modelId
-    showText = `系统任务: ${configForm.value.modelName || configForm.value.modelId}`
+    // 如果modelName为空但modelKey存在，尝试从modelOptions中查找对应的formName
+    if (!configForm.value.modelName && configForm.value.modelKey && modelOptions.value.length > 0) {
+      const selectedModel = modelOptions.value.find(item => item.id === configForm.value.modelKey || item.key === configForm.value.modelKey)
+      if (selectedModel) {
+        configForm.value.modelName = selectedModel.formName
+      }
+    }
+    
+    console.log('getShowText中的configForm:', configForm.value)
+    // 使用modelName(formName)显示，如果没有则使用modelKey
+    showText = `系统任务: ${configForm.value.modelName || configForm.value.modelKey}`
   } else {
     showText = `${configForm.value.method === BpmHttpRequestMethodEnum.GET ? 'GET' : 
                 configForm.value.method === BpmHttpRequestMethodEnum.POST ? 'POST' : 
@@ -532,7 +540,7 @@ const showHttpTaskNodeConfig = async (node: SimpleFlowNode) => {
     // 使用cloneDeep对整个配置对象进行深拷贝
     configForm.value = {
       systemTask: node.httpRequestSetting.systemTask || false,
-      modelId: node.httpRequestSetting.modelId || '',
+      modelKey: node.httpRequestSetting.modelKey || '',
       modelName: node.httpRequestSetting.modelName || '',
       refreshId: node.httpRequestSetting.refreshId || '',
       method: node.httpRequestSetting.method || BpmHttpRequestMethodEnum.POST,
@@ -542,9 +550,9 @@ const showHttpTaskNodeConfig = async (node: SimpleFlowNode) => {
       response: cloneDeep(node.httpRequestSetting.response) || []
     }
     
-    // 如果有modelId但没有modelName，尝试从选项中找到对应的formName
-    if (configForm.value.modelId && !configForm.value.modelName) {
-      const selectedModel = modelOptions.value.find(item => item.id === configForm.value.modelId)
+    // 如果有modelKey但没有modelName，尝试从选项中找到对应的formName
+    if (configForm.value.modelKey && !configForm.value.modelName) {
+      const selectedModel = modelOptions.value.find(item => item.id === configForm.value.modelKey)
       if (selectedModel) {
         configForm.value.modelName = selectedModel.formName
       }
@@ -566,10 +574,10 @@ const showHttpTaskNodeConfig = async (node: SimpleFlowNode) => {
     }
     
     // 如果是系统任务并且有模型ID，加载表单字段
-    if (configForm.value.systemTask && configForm.value.modelId && !isLoadingFormFields.value) {
+    if (configForm.value.systemTask && configForm.value.modelKey && !isLoadingFormFields.value) {
       isLoadingFormFields.value = true
       try {
-        await getProcessDefinitionFormFields(configForm.value.modelId)
+        await getProcessDefinitionFormFields(configForm.value.modelKey)
       } finally {
         isLoadingFormFields.value = false
       }
@@ -617,4 +625,4 @@ const showHttpTaskNodeConfig = async (node: SimpleFlowNode) => {
 defineExpose({ openDrawer, showHttpTaskNodeConfig }) // 暴露方法给父组件
 </script>
 
-<style lang="scss" scoped></style> 
+<style lang="scss" scoped></style>

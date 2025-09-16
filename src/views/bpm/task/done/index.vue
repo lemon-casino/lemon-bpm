@@ -28,12 +28,12 @@
         />
 
         
-        <div class="flex items-center gap-12px">
+        <div class="search-controls">
           <el-select
             v-model="queryParams.category"
             placeholder="请选择流程分类"
             clearable
-            class="!w-155px"
+            class="control-select"
             @change="handleQuery"
           >
             <el-option
@@ -48,7 +48,7 @@
             v-model="queryParams.status"
             placeholder="请选择流程状态"
             clearable
-            class="!w-155px"
+            class="control-select"
             @change="handleQuery"
           >
             <el-option
@@ -59,9 +59,9 @@
             />
           </el-select>
           
-          <el-button @click="showPopover = !showPopover">
+          <el-button @click="showPopover = !showPopover" class="filter-button">
             <Icon icon="ep:filter" class="mr-5px" />
-            高级筛选
+            <span class="button-text">高级筛选</span>
           </el-button>
         </div>
       </div>
@@ -172,15 +172,14 @@
     
     <!-- 分页 - 固定底部 -->
     <div class="pagination-container fixed-pagination">
-      <el-pagination
-        v-model:current-page="queryParams.pageNo"
-        v-model:page-size="queryParams.pageSize"
-        :page-sizes="[12, 21, 51, 104]"
-        background
-        layout="total, sizes, prev, pager, next, jumper"
+      <Pagination
         :total="total"
-        @size-change="getList"
-        @current-change="getList"
+        v-model:page="queryParams.pageNo"
+        v-model:limit="queryParams.pageSize"
+        :pagerCount="4"
+        @pagination="getList"
+        :hide-on-single-page="false"
+        class="mobile-pagination"
       />
     </div>
   </div>
@@ -376,6 +375,33 @@ const getUserList = async () => {
   flex-direction: column;
   background-color: var(--el-bg-color);
   overflow: hidden;
+  
+  /* 移动端适配 - 允许整体滚动 */
+  @media (max-width: 768px) {
+    height: calc(100vh - 80px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-behavior: smooth; /* 平滑滚动 */
+    -webkit-overflow-scrolling: touch; /* iOS惯性滚动 */
+    
+    /* 自定义滚动条样式 */
+    &::-webkit-scrollbar {
+      width: 4px;
+    }
+    
+    &::-webkit-scrollbar-thumb {
+      background-color: rgba(144, 147, 153, 0.3);
+      border-radius: 2px;
+    }
+    
+    &::-webkit-scrollbar-track {
+      background-color: transparent;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    height: calc(100vh - 60px);
+  }
 }
 
 .fixed-header {
@@ -384,6 +410,16 @@ const getUserList = async () => {
   border-bottom: 1px solid var(--el-border-color-light);
   z-index: 1;
   flex-shrink: 0;
+  
+  /* 移动端头部适配 */
+  @media (max-width: 768px) {
+    position: relative;
+    padding: 12px 16px;
+  }
+  
+  @media (max-width: 480px) {
+    padding: 10px 12px;
+  }
 }
 
 .fixed-search {
@@ -392,6 +428,18 @@ const getUserList = async () => {
   border-bottom: 1px solid var(--el-border-color-light);
   z-index: 1;
   flex-shrink: 0;
+  
+  /* 移动端适配 - 允许搜索栏滑动 */
+  @media (max-width: 768px) {
+    padding: 12px 16px;
+    position: relative;
+    transform: translateY(0);
+    transition: transform 0.3s ease;
+  }
+  
+  @media (max-width: 480px) {
+    padding: 10px 12px;
+  }
 }
 
 .table-scroll-area {
@@ -417,6 +465,17 @@ const getUserList = async () => {
   /* Firefox滚动条样式 */
   scrollbar-width: thin;
   scrollbar-color: rgba(144, 147, 153, 0.3) transparent;
+  
+  /* 移动端适配 - 不再单独滚动 */
+  @media (max-width: 768px) {
+    padding: 16px 12px;
+    overflow: visible;
+    flex: none;
+  }
+  
+  @media (max-width: 480px) {
+    padding: 12px 8px;
+  }
 }
 
 .task-cards {
@@ -424,6 +483,17 @@ const getUserList = async () => {
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   padding: 0 4px;
+  
+  /* 移动端网格适配 */
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 0;
+  }
+  
+  @media (max-width: 480px) {
+    gap: 10px;
+  }
 }
 
 .done-task-card {
@@ -436,6 +506,18 @@ const getUserList = async () => {
   flex-direction: column;
   overflow: hidden;
   position: relative;
+  
+  /* 移动端卡片适配 */
+  @media (max-width: 768px) {
+    height: auto;
+    min-height: 200px;
+    
+    &:hover {
+      transform: none; /* 移动端禁用悬停变换 */
+      height: auto;
+      min-height: 200px;
+    }
+  }
   
   &:hover {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -485,6 +567,13 @@ const getUserList = async () => {
       gap: 8px;
       margin-bottom: 4px;
       flex-shrink: 0;
+      
+      /* 移动端信息网格适配 */
+      @media (max-width: 768px) {
+        grid-template-columns: 1fr;
+        gap: 10px;
+        margin-bottom: 8px;
+      }
       
       .info-item {
         .info-label {
@@ -668,6 +757,46 @@ const getUserList = async () => {
   justify-content: flex-end;
   flex-shrink: 0;
   z-index: 1;
+  
+  /* 移动端分页适配 - 不再固定 */
+  @media (max-width: 768px) {
+    justify-content: center;
+    padding: 12px 16px;
+    position: relative;
+    margin-bottom: 20px; /* 底部留出空间 */
+    
+    :deep(.el-pagination) {
+      .el-pagination__sizes,
+      .el-pagination__jump {
+        display: none; /* 移动端隐藏页面大小选择和跳转 */
+      }
+      
+      .el-pager {
+        .number {
+          min-width: 32px;
+          height: 32px;
+          line-height: 32px;
+        }
+      }
+      
+      .btn-prev,
+      .btn-next {
+        min-width: 32px;
+        height: 32px;
+      }
+    }
+  }
+  
+  @media (max-width: 480px) {
+    padding: 10px 12px;
+    margin-bottom: 16px;
+    
+    :deep(.el-pagination) {
+      .el-pagination__total {
+        display: none; /* 小屏幕隐藏总数显示 */
+      }
+    }
+  }
 }
 
 @media screen and (max-width: 1440px) {
@@ -682,9 +811,188 @@ const getUserList = async () => {
   }
 }
 
-@media screen and (max-width: 128px) {
+@media screen and (max-width: 768px) {
   .task-cards {
     grid-template-columns: 1fr;
+  }
+}
+
+/* 搜索栏移动端样式 */
+.bpm-search-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  
+  .search-input {
+    flex: 1;
+    min-width: 200px;
+  }
+  
+  .search-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    
+    .control-select {
+      width: 155px;
+    }
+    
+    .filter-button {
+      display: flex;
+      align-items: center;
+      
+      .button-text {
+        display: inline;
+      }
+    }
+  }
+  
+  /* 移动端搜索栏适配 */
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    
+    .search-input {
+      width: 100%;
+      min-width: unset;
+    }
+    
+    .search-controls {
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+      
+      .control-select {
+        width: 100%;
+      }
+      
+      .filter-button {
+        width: 100%;
+        justify-content: center;
+        
+        .button-text {
+          display: inline;
+        }
+      }
+    }
+  }
+  
+  @media (max-width: 480px) {
+    gap: 10px;
+    
+    .search-controls {
+      gap: 8px;
+      
+      .filter-button {
+        .button-text {
+          display: none; /* 小屏幕只显示图标 */
+        }
+        
+        .mr-5px {
+          margin-right: 0 !important;
+        }
+      }
+    }
+  }
+}
+
+/* 高级筛选面板移动端适配 */
+.bpm-advanced-filter {
+  background-color: var(--el-bg-color-overlay);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 12px;
+  border: 1px solid var(--el-border-color-light);
+  
+  .filter-title {
+    display: flex;
+    align-items: center;
+    margin-bottom: 16px;
+    font-weight: 500;
+    color: var(--el-text-color-primary);
+    
+    .filter-icon {
+      margin-right: 8px;
+      color: var(--el-color-primary);
+    }
+  }
+  
+  .filter-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+    
+    @media (max-width: 768px) {
+      flex-direction: row;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      margin-top: 20px;
+      padding: 0 8px;
+      
+      .el-button {
+        flex: 1;
+        max-width: 100px;
+        height: 44px;
+        font-size: 16px;
+        border-radius: 8px;
+        
+        /* 确保按钮文字居中 */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      gap: 8px;
+      padding: 0 4px;
+      
+      .el-button {
+        height: 48px;
+        font-size: 16px;
+        max-width: 90px;
+        
+        /* 小屏幕进一步优化 */
+        padding: 0 12px;
+      }
+    }
+  }
+  
+  /* 移动端适配 */
+  @media (max-width: 768px) {
+    padding: 16px;
+    margin-top: 10px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    
+    .filter-title {
+      margin-bottom: 16px;
+      font-size: 16px;
+      justify-content: center;
+      
+      .filter-icon {
+        font-size: 18px;
+      }
+    }
+  }
+  
+  @media (max-width: 480px) {
+    padding: 14px;
+    border-radius: 10px;
+    
+    .filter-title {
+      margin-bottom: 14px;
+      font-size: 15px;
+      
+      .filter-icon {
+        font-size: 16px;
+      }
+    }
   }
 }
 </style>

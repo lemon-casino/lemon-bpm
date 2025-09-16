@@ -12,7 +12,7 @@
       </el-radio-group>
     </el-form-item>
     <el-form-item v-if="modelData.formType === BpmModelFormType.NORMAL" label="流程表单" prop="formId">
-      <el-select v-model="modelData.formId" clearable style="width: 100%" :disabled="props.isPreviewOnly">
+      <el-select v-model="modelData.formId" clearable style="width: 100%" :disabled="props.isPreviewOnly" filterable>
         <el-option v-for="form in formList" :key="form.id" :label="form.name" :value="form.id" />
       </el-select>
     </el-form-item>

@@ -14,6 +14,7 @@
                 <el-row :gutter="10">
                   <el-col :xs="24" :sm="24" :md="17" :lg="17" :xl="17">
                     <form-create
+                      :key="formCreateKey"
                       :rule="detailForm.rule"
                       v-model:api="fApi"
                       v-model="detailForm.value"
@@ -57,11 +58,11 @@
         </el-tabs>
 
         <!-- 底部操作栏 -->
-        <div class="b-t-solid border-t-1px border-[var(--el-border-color)] operation-button-container">
+        <div class="operation-button-container">
           <!-- 操作栏按钮 -->
           <div
             v-if="activeTab === 'form'"
-            class="h-50px bottom-10 text-14px flex items-center color-#32373c dark:color-#fff font-bold btn-container"
+            class="btn-container"
           >
             <el-button
               plain type="success" @click="submitForm" :disabled="fileUploading || processInstanceStartLoading"
@@ -77,28 +78,27 @@
               <Icon icon="ep:edit" class="button-icon" />&nbsp; 草稿箱
             </el-button>
             <!-- 文件上传状态指示器 -->
-            <div v-if="fileUploading" class="inline-flex items-center ml-10px text-red-500 font-bold py-1 px-2 rounded text-sm bg-red-100 upload-indicator">
+            <div v-if="fileUploading" class="upload-indicator">
               <Icon  class="mr-2 animate-spin text-red-500 upload-spinner" :size="18" />
               文件上传中...
             </div>
-            <!-- 删除调试按钮 -->
           </div>
         </div>
       </el-scrollbar>
     </div>
-    
+
     <!-- 草稿箱对话框 -->
     <ProcessDraftDialog
       ref="draftDialogRef"
-      :process-definition-id="selectProcessDefinition.id"
-      :process-definition-key="selectProcessDefinition.key || selectProcessDefinition.id"
+      :process-definition-id="currentProcessDefinitionId"
+      :process-definition-key="selectProcessDefinition.key || currentProcessDefinitionId"
       :model-id="selectProcessDefinition.modelId || ''"
       :form-data="detailForm.value"
       :start-user-select-assignees="startUserSelectAssignees"
       @save-success="handleDraftSaveSuccess"
       @show-list="handleShowDraftList"
     />
-    
+
     <!-- 草稿列表抽屉 -->
     <ProcessDraftDrawer
       ref="draftDrawerRef"
@@ -129,7 +129,7 @@ import { ApprovalNodeInfo } from '@/api/bpm/processInstance'
 import { useWebSocketMessage } from '@/hooks/web/useWebSocketMessage'
 import { emitter, UPLOAD_STATUS_EVENT } from '@/utils/eventBus'
 import { ElLoading, ElMessageBox } from 'element-plus'
-import { nextTick } from 'vue'
+import { nextTick,onUnmounted  } from 'vue'
 
 defineOptions({ name: 'ProcessDefinitionDetail' })
 const props = defineProps<{
@@ -158,19 +158,26 @@ const activeTab = ref('form') // 当前的 Tab
 const activityNodes = ref<ProcessInstanceApi.ApprovalNodeInfo[]>([]) // 审批节点信息
 // 添加文件上传状态变量
 const fileUploading = ref(false) // 是否有文件正在上传
-
+// 是否重新发起流程
+const isReapply = ref(false)
+// 当前流程定义 ID
+const currentProcessDefinitionId = ref(props.selectProcessDefinition.id)
 // 草稿箱相关
 const draftDialogRef = ref()
 const draftDrawerRef = ref()
+// 添加form-create组件的key值，用于强制重新渲染
+const formCreateKey = ref(Date.now())
 
 // 使用 WebSocket 消息
-const { sendMessage, sendBroadcast } = useWebSocketMessage()
+const { sendMessage, sendBroadcast ,onMessage } = useWebSocketMessage()
 
 /** 设置表单信息、获取流程图数据 **/
 const initProcessInfo = async (row: any, formVariables?: any) => {
   // 重置指定审批人
   startUserSelectTasks.value = []
   startUserSelectAssignees.value = {}
+  // 记录是否为重新发起流程
+  isReapply.value = !!(formVariables && Object.keys(formVariables).length > 0)
 
   // 情况一：流程表单
   if (row.formType == BpmModelFormType.NORMAL) {
@@ -188,7 +195,7 @@ const initProcessInfo = async (row: any, formVariables?: any) => {
 
     await nextTick()
     fApi.value?.btn.show(false) // 隐藏提交按钮
-    
+
     // 获取流程审批信息
     await getApprovalDetail(row)
 
@@ -207,6 +214,79 @@ const initProcessInfo = async (row: any, formVariables?: any) => {
   }
 }
 
+
+/**
+ * 更新本地存储中的流程定义数据
+ */
+const updateLocalStorageProcessDefinition = (newProcessDefinitionId: string) => {
+  try {
+    const storageKey = 'bpm_process_instance_state'
+    const storedData = localStorage.getItem(storageKey)
+    
+    if (storedData) {
+      const parsedData = JSON.parse(storedData)
+      
+      // 更新流程定义ID
+      if (parsedData.selectProcessDefinition) {
+        parsedData.selectProcessDefinition.id = newProcessDefinitionId
+        parsedData.timestamp = Date.now()
+        
+        // 检查formData中的字段是否在新的表单配置中存在
+        if (parsedData.formData && parsedData.selectProcessDefinition.formFields) {
+          const allowedFields = parsedData.selectProcessDefinition.formFields
+            .map((fieldStr: string) => {
+              try {
+                const fieldObj = JSON.parse(fieldStr)
+                return fieldObj.field
+              } catch {
+                return null
+              }
+            })
+            .filter(Boolean)
+          
+          // 移除不存在于新表单配置中的字段
+          const filteredFormData: Record<string, any> = {}
+          Object.keys(parsedData.formData).forEach(key => {
+            if (allowedFields.includes(key)) {
+              filteredFormData[key] = parsedData.formData[key]
+            }
+          })
+          
+          parsedData.formData = filteredFormData
+        }
+        
+        // 更新本地存储
+        localStorage.setItem(storageKey, JSON.stringify(parsedData))
+      }
+    }
+  } catch (error) {
+    console.warn('更新本地存储失败:', error)
+  }
+}
+
+// 监听流程定义版本变更通知
+const stopVersionListener = onMessage(async (msg: any) => {
+  if (msg.type === 'PROCESS_DEFINITION_VERSION_CHANGED') {
+    const { key, processDefinitionId } = msg.data || {}
+    if (key === props.selectProcessDefinition.key && processDefinitionId) {
+      // 更新流程定义ID
+      currentProcessDefinitionId.value = processDefinitionId
+      
+      // 更新本地存储数据
+      updateLocalStorageProcessDefinition(processDefinitionId)
+      
+      // 强制重新渲染form-create组件
+      formCreateKey.value = Date.now()
+      
+      message.success('流程已更新为最新版本')
+      
+      // 重新初始化流程信息
+      await initProcessInfo({ ...props.selectProcessDefinition, id: currentProcessDefinitionId.value })
+    }
+  }
+})
+onUnmounted(() => stopVersionListener())
+
 /** 预测流程节点会因为输入的参数值而产生新的预测结果值，所以需重新预测一次 */
 watch(
   detailForm.value,
@@ -217,7 +297,7 @@ watch(
       startUserSelectAssignees.value = {}
       // 加载最新的审批详情
       getApprovalDetail({
-        id: props.selectProcessDefinition.id,
+        id:  currentProcessDefinitionId.value,
         processVariablesStr: JSON.stringify(newValue.value) // 解决 GET 无法传递对象的问题，后端 String 再转 JSON
       })
     }
@@ -270,6 +350,10 @@ const getApprovalDetail = async (row: any) => {
       Object.keys(formFieldsPermission).forEach((item) => {
         setFieldPermission(item, formFieldsPermission[item])
       })
+      // 如果是重新发起流程，清除无编辑权限的字段数据
+      if (isReapply.value) {
+        clearNoEditFields(detailForm.value.value)
+      }
     }
   } finally {
   }
@@ -293,18 +377,38 @@ const setFieldPermission = (field: string, permission: string) => {
   }
 }
 
+/**
+ * 清除无编辑权限字段的值
+ */
+const clearNoEditFields = (values: Record<string, any>) => {
+  if (!values) {
+    return
+  }
+  Object.keys(formFields.value || {}).forEach((key) => {
+    const perm = formFields.value[key]
+    if (perm && perm !== FieldPermissionType.WRITE && key in values) {
+      delete values[key]
+      try {
+        fApi.value?.setValue(key, undefined)
+      } catch (e) {
+        // ignore
+      }
+    }
+  })
+}
+
 /** 提交按钮 */
 const submitForm = async () => {
   if (!fApi.value || !props.selectProcessDefinition) {
     return
   }
-  
+
   // 检查文件是否正在上传中
   if (fileUploading.value) {
     message.warning('请等待文件上传完成后再发起流程')
     return
   }
-  
+
   // 流程表单校验
   await validateForm()
   // 如果有指定审批人，需要校验
@@ -322,16 +426,16 @@ const submitForm = async () => {
   processInstanceStartLoading.value = true
   try {
     await ProcessInstanceApi.createProcessInstance({
-      processDefinitionId: props.selectProcessDefinition.id,
+      processDefinitionId:  currentProcessDefinitionId.value,
       variables: detailForm.value.value,
       startUserSelectAssignees: startUserSelectAssignees.value
     })
 
     // 获取第一个审批节点（跳过发起人节点）
-    const firstApprovalNode = activityNodes.value?.find(node => 
+    const firstApprovalNode = activityNodes.value?.find(node =>
       node.nodeType === 11 && node.candidateUsers && node.candidateUsers.length > 0
     )
-    
+
     // 包装消息发送为 Promise，确保能正确处理异步操作
     const sendNotifications = async () => {
       try {
@@ -342,17 +446,17 @@ const submitForm = async () => {
             return new Promise((resolve) => {
               // 发送消息
               sendMessage(
-                approver.id, 
+                approver.id,
                 `新的流程 ${props.selectProcessDefinition.name} 需要您审批`
               )
               // 给一个短暂的延迟以确保消息发送
               setTimeout(resolve, 100)
             })
           })
-          
+
           // 等待所有消息发送完成
           await Promise.all(sendPromises)
-          
+
           // 发送广播
           await new Promise(resolve => {
             sendBroadcast('process-approve')
@@ -365,22 +469,61 @@ const submitForm = async () => {
         return false
       }
     }
-    
+
     // 等待消息发送完成
     await sendNotifications()
-    
+
     // 添加短暂延迟确保所有消息都已发送
     await new Promise(resolve => setTimeout(resolve, 200))
 
     // 提示
     message.success('发起流程成功')
-    
+
     // 弹出确认对话框询问是否保留当前填写状态
     try {
       const result = await new Promise((resolve) => {
+        // 检测是否为移动端
+        const isMobileDevice = window.innerWidth <= 768
+        
         ElMessageBox({
           title: '流程发起成功',
-          message: `
+          message: isMobileDevice ? `
+            <div class="mobile-success-dialog">
+              <div class="success-icon">
+                <svg viewBox="0 0 24 24" width="48" height="48" fill="currentColor">
+                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+                </svg>
+              </div>
+              <div class="success-title">流程发起成功！</div>
+              <div class="success-subtitle">请选择下一步操作</div>
+              
+              <div class="mobile-action-buttons">
+                <button id="goToMyProcess" class="mobile-btn mobile-btn-primary">
+                  <span class="btn-icon">🏠</span>
+                  <div class="btn-content">
+                    <div class="btn-title">进入我的流程</div>
+                    <div class="btn-desc">保持状态并跳转</div>
+                  </div>
+                </button>
+                
+                <button id="stayCurrentPage" class="mobile-btn mobile-btn-info">
+                  <span class="btn-icon">⏸️</span>
+                  <div class="btn-content">
+                    <div class="btn-title">留在当前页</div>
+                    <div class="btn-desc">保持状态不跳转</div>
+                  </div>
+                </button>
+                
+                <button id="returnToList" class="mobile-btn mobile-btn-secondary">
+                  <span class="btn-icon">📋</span>
+                  <div class="btn-content">
+                    <div class="btn-title">返回列表</div>
+                    <div class="btn-desc">清空并返回列表</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          ` : `
             <div style="text-align: center; padding: 20px 0;">
               <div style="font-size: 16px; color: #409EFF; margin-bottom: 20px;">
                 <i class="el-icon-success" style="font-size: 24px; margin-right: 8px;"></i>
@@ -414,7 +557,7 @@ const submitForm = async () => {
           showConfirmButton: false,
           showCancelButton: false,
           center: true,
-          customClass: 'custom-success-dialog',
+          customClass: isMobileDevice ? 'mobile-success-messagebox' : 'custom-success-dialog',
           showClose: false,
           type: '',
           icon: '',
@@ -423,35 +566,35 @@ const submitForm = async () => {
             // 因为DOM元素会被销毁，事件监听器会自动被清理
           }
         })
-        
+
         // 定义事件处理函数
         const handleGoToMyProcess = () => {
           resolve('goToMyProcess')
           ElMessageBox.close()
         }
-        
+
         const handleStayCurrentPage = () => {
           resolve('stayCurrentPage')
           ElMessageBox.close()
         }
-        
+
         const handleReturnToList = () => {
           resolve('returnToList')
           ElMessageBox.close()
         }
-        
+
         // 添加按钮点击事件监听器
         nextTick(() => {
           const goBtn = document.getElementById('goToMyProcess')
           const stayBtn = document.getElementById('stayCurrentPage')
           const returnBtn = document.getElementById('returnToList')
-          
+
           if (goBtn) goBtn.addEventListener('click', handleGoToMyProcess)
           if (stayBtn) stayBtn.addEventListener('click', handleStayCurrentPage)
           if (returnBtn) returnBtn.addEventListener('click', handleReturnToList)
         })
       })
-      
+
       // 根据用户选择执行不同的操作
       if (result === 'goToMyProcess') {
         // 用户选择"进入我的流程" - 保留状态并跳转
@@ -463,10 +606,10 @@ const submitForm = async () => {
         // 用户选择"留在当前页" - 保留状态但不跳转
         // 什么都不做，保持当前状态
         console.log('用户选择留在当前页面，保留状态')
-             } else if (result === 'returnToList') {
-         // 用户选择"返回列表" - 清空状态并调用取消处理函数
-         handleCancel()
-       }
+      } else if (result === 'returnToList') {
+        // 用户选择"返回列表" - 清空状态并调用取消处理函数
+        handleCancel()
+      }
     } catch (error) {
       console.error('对话框处理失败:', error)
       // 如果对话框失败，默认跳转到我的流程
@@ -528,7 +671,7 @@ onMounted(() => {
   emitter.on(UPLOAD_STATUS_EVENT, (uploading: boolean) => {
     if (fileUploading.value !== uploading) {
       fileUploading.value = uploading
-      
+
       // 强制UI更新
       nextTick(() => {
       })
@@ -549,52 +692,64 @@ const fillFormVariables = (formVariables) => {
   if (!formVariables || Object.keys(formVariables).length === 0) {
     return
   }
-  
+
+  // 过滤无编辑权限的字段
+  const editableVariables = { ...formVariables }
+  Object.keys(formFields.value || {}).forEach((key) => {
+    const perm = formFields.value[key]
+    if (perm && perm !== FieldPermissionType.WRITE) {
+      delete editableVariables[key]
+    }
+  })
+
   try {
     // 更新表单数据
     if (detailForm.value && fApi.value) {
       // 先保存表单变量到detailForm.value
-      detailForm.value.value = { ...formVariables }
-      
+      detailForm.value.value = { ...editableVariables }
+
       // 重新解析表单规则和配置
       if (props.selectProcessDefinition && props.selectProcessDefinition.formConf && props.selectProcessDefinition.formFields) {
         // 保留当前值，重新设置表单
-        setConfAndFields2(detailForm, props.selectProcessDefinition.formConf, props.selectProcessDefinition.formFields, formVariables)
-        
+        setConfAndFields2(detailForm, props.selectProcessDefinition.formConf, props.selectProcessDefinition.formFields, editableVariables)
+
         // 等待表单重新渲染
-        nextTick(async () => {
+        nextTick(() => {
           // 设置表单字段权限
           if (formFields.value) {
             Object.keys(formFields.value).forEach((item) => {
               setFieldPermission(item, formFields.value[item])
             })
           }
-          
+
           // 隐藏提交按钮
           fApi.value?.btn.show(false)
-          
+
           // 强制刷新表单
           if (fApi.value?.refreshValue) {
             fApi.value.refreshValue()
           }
+          // 再次清除无权限字段
+          clearNoEditFields(detailForm.value.value)
         })
       } else {
         // 使用form-create的API逐个设置字段值
-        Object.keys(formVariables).forEach(key => {
-          if (formVariables[key] !== undefined) {
+        Object.keys(editableVariables).forEach(key => {
+          if (editableVariables[key] !== undefined) {
             try {
-              fApi.value.setValue(key, formVariables[key])
+              fApi.value.setValue(key, editableVariables[key])
             } catch (e) {
               console.error(`设置字段 ${key} 失败:`, e)
             }
           }
         })
-        
+
         // 强制表单更新
         nextTick(() => {
           if (fApi.value?.refreshValue) {
             fApi.value.refreshValue()
           }
+          clearNoEditFields(detailForm.value.value)
         })
       }
     }
@@ -632,7 +787,7 @@ const handleDraftSelect = async (draft: DraftApi.BpmProcessDraftDO) => {
     message.warning('草稿数据无效')
     return
   }
-  
+
   // 确定表单数据源
   let formData = null
   if (draft.formVariables) {
@@ -640,18 +795,18 @@ const handleDraftSelect = async (draft: DraftApi.BpmProcessDraftDO) => {
   } else if (draft.variables) {
     formData = draft.variables
   }
-  
+
   if (!formData) {
     message.warning('草稿中没有表单数据')
     return
   }
-  
+
   // 检查表单实例是否准备好
   if (!fApi.value) {
     message.error('表单未准备好，请刷新页面后重试')
     return
   }
-  
+
   try {
     // 显示加载状态
     const loading = ElLoading.service({
@@ -659,19 +814,19 @@ const handleDraftSelect = async (draft: DraftApi.BpmProcessDraftDO) => {
       text: '加载草稿数据中...',
       background: 'rgba(0, 0, 0, 0.7)'
     })
-    
+
     // 填充表单数据
     fillFormVariables(formData)
-    
+
     // 如果有审批人数据，也填充
     if (draft.startUserSelectAssignees) {
       startUserSelectAssignees.value = draft.startUserSelectAssignees
       tempStartUserSelectAssignees.value = draft.startUserSelectAssignees
     }
-    
+
     // 等待表单渲染完成
     await nextTick()
-    
+
     // 关闭加载状态
     setTimeout(() => {
       loading.close()
@@ -691,11 +846,7 @@ const getFormData = () => {
 // 暴露方法给父组件
 defineExpose({
   initProcessInfo,
-  fillFormVariables: (formVariables) => {
-    if (formVariables && Object.keys(formVariables).length > 0) {
-      detailForm.value.value = { ...detailForm.value.value, ...formVariables }
-    }
-  },
+  fillFormVariables,
   getFormData
 })
 </script>
@@ -719,17 +870,22 @@ $process-header-height: 105px;
     display: flex;
     height: calc(
       100vh - var(--top-tool-height) - var(--tags-view-height) - var(--app-footer-height) - 35px -
-        $process-header-height - 40px
+      $process-header-height - 40px - $button-height
     );
     max-height: calc(
       100vh - var(--top-tool-height) - var(--tags-view-height) - var(--app-footer-height) - 35px -
-        $process-header-height - 40px
+      $process-header-height - 40px - $button-height
     );
     overflow: auto;
     flex-direction: column;
     border-radius: 8px;
     padding: 0;
     position: relative;
+
+    // 移动端为底部固定按钮预留空间
+    @media (max-width: 767px) {
+      padding-bottom: 70px; // 为固定底部按钮预留空间
+    }
 
 
 
@@ -806,15 +962,48 @@ $process-header-height: 105px;
 .operation-button-container {
   position: relative;
   z-index: 100;
+  border-top: 1px solid var(--el-border-color);
+  background: var(--el-bg-color);
 
-  @media (max-width: 575px) {
-    padding: 5px 0;
+  // 桌面端样式
+  @media (min-width: 768px) {
+    padding: 10px 0;
+  }
+
+  // 移动端固定在底部
+  @media (max-width: 767px) {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: var(--el-bg-color);
+    border-top: 1px solid var(--el-border-color-light);
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+    padding: 12px 16px;
+    backdrop-filter: blur(8px);
   }
 
   .btn-container {
-    @media (max-width: 575px) {
-      height: 40px !important;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
+    height: 50px;
+    font-size: 14px;
+    color: #32373c;
+    font-weight: bold;
+
+    @media (prefers-color-scheme: dark) {
+      color: #fff;
+    }
+
+    // 移动端按钮容器样式
+    @media (max-width: 767px) {
+      height: auto;
+      min-height: 44px;
       flex-wrap: wrap;
+      justify-content: center;
       gap: 8px;
     }
   }
@@ -822,29 +1011,55 @@ $process-header-height: 105px;
 
 // 按钮响应式样式
 .el-button {
-  @media (max-width: 575px) {
-    padding: 6px 12px;
-    min-height: 32px;
-    font-size: 13px;
+  // 移动端按钮优化
+  @media (max-width: 767px) {
+    padding: 8px 16px;
+    min-height: 36px;
+    font-size: 14px;
+    border-radius: 20px;
+    flex: 1;
+    max-width: 100px;
 
     .button-icon {
       font-size: 16px;
     }
   }
+
+  // 小屏幕进一步优化
+  @media (max-width: 480px) {
+    padding: 6px 12px;
+    min-height: 32px;
+    font-size: 13px;
+    max-width: 80px;
+  }
 }
 
 // 上传状态指示器响应式样式
 .upload-indicator {
-  @media (max-width: 575px) {
-    margin-left: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 10px;
+  text-red-500: true;
+  font-weight: bold;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  background-color: #fef2f2;
+
+  @media (max-width: 767px) {
+    margin-left: 0;
     width: 100%;
     justify-content: center;
-    margin-top: 5px;
+    margin-top: 8px;
+    order: 10; // 确保在移动端显示在最后
   }
 
   .upload-spinner {
-    @media (max-width: 575px) {
-      margin-right: 5px !important;
+    margin-right: 8px;
+    color: #ef4444;
+
+    @media (max-width: 767px) {
+      margin-right: 5px;
     }
   }
 }
@@ -898,61 +1113,206 @@ $process-header-height: 105px;
   }
 }
 
-// 自定义成功对话框样式
+// 移动端成功弹框样式
+:deep(.mobile-success-messagebox) {
+  .el-message-box {
+    width: 95vw !important;
+    max-width: 400px;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  }
+
+  .el-message-box__header {
+    display: none; // 隐藏默认标题栏
+  }
+
+  .el-message-box__content {
+    padding: 0;
+
+    .el-message-box__message {
+      margin: 0;
+      
+      .mobile-success-dialog {
+        text-align: center;
+        padding: 30px 20px 20px;
+        background: linear-gradient(135deg, #f6f9fc 0%, #ffffff 100%);
+        
+        .success-icon {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          width: 80px;
+          height: 80px;
+          margin: 0 auto 20px;
+          background: linear-gradient(135deg, #67C23A, #85ce61);
+          border-radius: 50%;
+          color: white;
+          box-shadow: 0 8px 20px rgba(103, 194, 58, 0.3);
+          
+          svg {
+            width: 48px;
+            height: 48px;
+          }
+        }
+        
+        .success-title {
+          font-size: 22px;
+          font-weight: 600;
+          color: #2c3e50;
+          margin-bottom: 8px;
+        }
+        
+        .success-subtitle {
+          font-size: 14px;
+          color: #7f8c8d;
+          margin-bottom: 30px;
+        }
+        
+        .mobile-action-buttons {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          
+          .mobile-btn {
+            display: flex;
+            align-items: center;
+            padding: 16px 20px;
+            border: none;
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            text-align: left;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            
+            &:active {
+              transform: scale(0.98);
+            }
+            
+            .btn-icon {
+              font-size: 24px;
+              margin-right: 16px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              width: 40px;
+              height: 40px;
+              border-radius: 12px;
+              background: rgba(255, 255, 255, 0.2);
+            }
+            
+            .btn-content {
+              flex: 1;
+              
+              .btn-title {
+                font-size: 16px;
+                font-weight: 600;
+                margin-bottom: 4px;
+                color: white;
+              }
+              
+              .btn-desc {
+                font-size: 13px;
+                opacity: 0.9;
+                color: white;
+              }
+            }
+            
+            &.mobile-btn-primary {
+              background: linear-gradient(135deg, #67C23A, #85ce61);
+              
+              &:hover {
+                background: linear-gradient(135deg, #85ce61, #67C23A);
+                transform: translateY(-2px);
+                box-shadow: 0 4px 16px rgba(103, 194, 58, 0.4);
+              }
+            }
+            
+            &.mobile-btn-info {
+              background: linear-gradient(135deg, #409EFF, #66b1ff);
+              
+              &:hover {
+                background: linear-gradient(135deg, #66b1ff, #409EFF);
+                transform: translateY(-2px);
+                box-shadow: 0 4px 16px rgba(64, 158, 255, 0.4);
+              }
+            }
+            
+            &.mobile-btn-secondary {
+              background: linear-gradient(135deg, #909399, #b3b6bc);
+              
+              &:hover {
+                background: linear-gradient(135deg, #b3b6bc, #909399);
+                transform: translateY(-2px);
+                box-shadow: 0 4px 16px rgba(144, 147, 153, 0.4);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  .el-message-box__btns {
+    display: none; // 隐藏默认按钮区域
+  }
+}
+
+// 自定义成功对话框样式（桌面端）
 :deep(.custom-success-dialog) {
   border-radius: 16px;
   overflow: hidden;
-  
+
   .el-message-box__header {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     padding: 20px 24px 16px;
     text-align: center;
-    
+
     .el-message-box__title {
       color: white;
       font-size: 18px;
       font-weight: 600;
     }
   }
-  
+
   .el-message-box__content {
     padding: 0 24px 20px;
-    
+
     .el-message-box__message {
       margin: 0;
     }
   }
-  
+
   .el-message-box__btns {
     padding: 20px 24px 24px;
     text-align: center;
     border-top: 1px solid #f0f0f0;
-    
+
     .el-button {
       min-width: 100px;
       border-radius: 20px;
       font-weight: 500;
       transition: all 0.3s ease;
-      
+
       &:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
       }
-      
+
       &.el-button--success {
         background: linear-gradient(135deg, #67C23A, #85ce61);
         border: none;
-        
+
         &:hover {
           background: linear-gradient(135deg, #85ce61, #67C23A);
         }
       }
-      
+
       &.el-button--info {
         background: linear-gradient(135deg, #909399, #b3b6bc);
         border: none;
-        
+
         &:hover {
           background: linear-gradient(135deg, #b3b6bc, #909399);
         }
@@ -961,4 +1321,3 @@ $process-header-height: 105px;
   }
 }
 </style>
-

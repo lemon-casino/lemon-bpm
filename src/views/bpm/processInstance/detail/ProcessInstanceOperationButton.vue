@@ -1,14 +1,21 @@
 <template>
-  <div class="flex flex-col w-full color-#32373c dark:color-#fff font-bold operations-panel">
+  <div 
+    class="flex flex-col w-full color-#32373c dark:color-#fff font-bold operations-panel" 
+    :class="{ 'keyboard-open': isKeyboardOpen, 'mobile-hidden': shouldHideButtonArea && isMobile }"
+    v-show="!shouldHideButtonArea || !isMobile"
+  >
+    <div  v-show="showMenu">
     <!-- 主要操作按钮组 - 始终保持在同一行 -->
     <div class="primary-actions-row" v-if="runningTask && isHandleTaskStatus()">
       <!-- 【通过】按钮 -->
       <el-popover
         :visible="popOverVisible.approve"
-        placement="top-end"
-        :width="420"
+        :placement="popoverPlacement"
+        :width="popoverWidth"
         trigger="click"
         v-if="isShowButton(OperationButtonType.APPROVE)"
+        :teleported="true"
+        :popper-style="popoverStyle"
       >
         <template #reference>
           <el-button
@@ -24,14 +31,14 @@
           </el-button>
         </template>
         <!-- 审批表单 -->
-        <div class="flex flex-col flex-1 pt-20px px-20px" v-loading="formLoading">
+        <div class="flex flex-col flex-1 popover-form-content" :class="isMobile ? 'pt-15px px-15px' : 'pt-20px px-20px'" v-loading="formLoading">
           <el-form
             label-position="top"
             class="mb-auto"
             ref="approveFormRef"
             :model="approveReasonForm"
             :rules="approveReasonRule"
-            label-width="100px"
+            :label-width="isMobile ? 'auto' : '100px'"
           >
             <el-card v-if="runningTask?.formId > 0" class="mb-15px !-mt-10px">
               <template #header>
@@ -51,7 +58,7 @@
                 v-model="approveReasonForm.reason"
                 :placeholder="`请输入${nodeTypeName}意见`"
                 type="textarea"
-                :rows="4"
+                :rows="isMobile ? 3 : 4"
               />
             </el-form-item>
             <el-form-item
@@ -69,14 +76,19 @@
               />
             </el-form-item>
             <el-form-item>
-              <el-button
-                :disabled="isApproveButtonDisabled"
-                type="success"
-                @click="handleAudit(true, approveFormRef)"
-              >
-                {{ getButtonDisplayName(OperationButtonType.APPROVE) }}
-              </el-button>
-              <el-button @click="closePropover('approve', approveFormRef)"> 取消 </el-button>
+              <div :class="isMobile ? 'flex flex-col gap-2' : 'flex gap-3'">
+                <el-button
+                  :disabled="isApproveButtonDisabled"
+                  type="success"
+                  @click="handleAudit(true, approveFormRef)"
+                  :class="isMobile ? 'w-full' : ''"
+                >
+                  {{ getButtonDisplayName(OperationButtonType.APPROVE) }}
+                </el-button>
+                <el-button @click="closePropover('approve', approveFormRef)" :class="isMobile ? 'w-full' : ''">
+                  取消
+                </el-button>
+              </div>
             </el-form-item>
           </el-form>
         </div>
@@ -85,10 +97,12 @@
       <!-- 【拒绝】按钮 -->
       <el-popover
         :visible="popOverVisible.reject"
-        placement="top-end"
-        :width="420"
+        :placement="popoverPlacement"
+        :width="popoverWidth"
         trigger="click"
         v-if="isShowButton(OperationButtonType.REJECT)"
+        :teleported="true"
+        :popper-style="popoverStyle"
       >
         <template #reference>
           <el-button
@@ -105,32 +119,37 @@
         </template>
 
         <!-- 审批表单 -->
-        <div class="flex flex-col flex-1 pt-20px px-20px" v-loading="formLoading">
+        <div class="flex flex-col flex-1" :class="isMobile ? 'pt-15px px-15px' : 'pt-20px px-20px'" v-loading="formLoading">
           <el-form
             label-position="top"
             class="mb-auto"
             ref="rejectFormRef"
             :model="rejectReasonForm"
             :rules="rejectReasonRule"
-            label-width="100px"
+            :label-width="isMobile ? 'auto' : '100px'"
           >
             <el-form-item label="审批意见" prop="reason">
               <el-input
                 v-model="rejectReasonForm.reason"
                 placeholder="请输入审批意见"
                 type="textarea"
-                :rows="4"
+                :rows="isMobile ? 3 : 4"
               />
             </el-form-item>
             <el-form-item>
-              <el-button
-                :disabled="isApproveButtonDisabled"
-                type="danger"
-                @click="handleAudit(false, rejectFormRef)"
-              >
-                {{ getButtonDisplayName(OperationButtonType.REJECT) }}
-              </el-button>
-              <el-button @click="closePropover('reject', rejectFormRef)"> 取消 </el-button>
+              <div :class="isMobile ? 'flex flex-col gap-2' : 'flex gap-3'">
+                <el-button
+                  :disabled="isApproveButtonDisabled"
+                  type="danger"
+                  @click="handleAudit(false, rejectFormRef)"
+                  :class="isMobile ? 'w-full' : ''"
+                >
+                  {{ getButtonDisplayName(OperationButtonType.REJECT) }}
+                </el-button>
+                <el-button @click="closePropover('reject', rejectFormRef)" :class="isMobile ? 'w-full' : ''">
+                  取消
+                </el-button>
+              </div>
             </el-form-item>
           </el-form>
         </div>
@@ -139,10 +158,12 @@
       <!-- 【暂存】按钮 -->
       <el-popover
         :visible="popOverVisible.save"
-        placement="top-end"
-        :width="420"
+        :placement="popoverPlacement"
+        :width="popoverWidth"
         trigger="click"
         v-if="props.writableFields && props.writableFields.length > 0"
+        :teleported="true"
+        :popper-style="popoverStyle"
       >
         <template #reference>
           <el-button
@@ -159,19 +180,26 @@
         </template>
         
         <!-- 暂存表单 -->
-        <div class="flex flex-col flex-1 pt-20px px-20px" v-loading="formLoading">
-          <div class="mb-15px text-center">
+        <div class="flex flex-col flex-1" :class="isMobile ? 'pt-15px px-15px' : 'pt-20px px-20px'" v-loading="formLoading">
+          <div :class="isMobile ? 'mb-12px text-center' : 'mb-15px text-center'">
             <Icon icon="ep:info-filled" class="text-blue-500 mr-2" :size="20" />
             <span class="font-medium">确定要暂存当前表单吗？</span>
           </div>
-          <div class="text-gray-500 mb-15px text-center text-sm">
+          <div :class="isMobile ? 'text-gray-500 mb-12px text-center text-xs' : 'text-gray-500 mb-15px text-center text-sm'">
             暂存后可以稍后继续编辑并提交
           </div>
-          <div class="flex justify-center">
-            <el-button :disabled="formLoading" type="primary" @click="handleSaveTaskForm">
+          <div :class="isMobile ? 'flex flex-col gap-2' : 'flex justify-center gap-3'">
+            <el-button 
+              :disabled="formLoading" 
+              type="primary" 
+              @click="handleSaveTaskForm"
+              :class="isMobile ? 'w-full' : ''"
+            >
               确认暂存
             </el-button>
-            <el-button @click="closePropover('save')">取消</el-button>
+            <el-button @click="closePropover('save')" :class="isMobile ? 'w-full' : ''">
+              取消
+            </el-button>
           </div>
         </div>
       </el-popover>
@@ -211,9 +239,11 @@
         <!-- 【管理员审批通过】按钮 -->
         <el-popover
           :visible="popOverVisible.adminApprove"
-          placement="top-start"
-          :width="420"
+          :placement="popoverPlacement"
+          :width="popoverWidth"
           trigger="click"
+          :teleported="true"
+          :popper-style="popoverStyle"
         >
           <template #reference>
             <div
@@ -234,7 +264,13 @@
               label-width="100px"
             >
               <el-form-item label="当前节点" prop="currentTaskId">
-                <el-select v-model="adminApproveForm.currentTaskId" clearable style="width: 100%">
+                <el-select 
+                  v-model="adminApproveForm.currentTaskId" 
+                  clearable 
+                  style="width: 100%"
+                  popper-class="high-z-index-select"
+                  :teleported="true"
+                >
                   <el-option
                     v-for="item in currentNodes"
                     :key="item.id"
@@ -267,9 +303,11 @@
         <!-- 【管理员退回】按钮 -->
         <el-popover
           :visible="popOverVisible.adminReturn"
-          placement="top-start"
-          :width="420"
+          :placement="popoverPlacement"
+          :width="popoverWidth"
           trigger="click"
+          :teleported="true"
+          :popper-style="popoverStyle"
         >
           <template #reference>
             <div
@@ -295,6 +333,8 @@
                   clearable
                   style="width: 100%"
                   @change="handleCurrentNodeChange"
+                  popper-class="high-z-index-select"
+                  :teleported="true"
                 >
                   <el-option
                     v-for="item in currentNodes"
@@ -308,7 +348,10 @@
                 <el-select
                   v-model="adminReturnForm.targetTaskDefinitionKey"
                   clearable
+                  filterable
                   style="width: 100%"
+                  popper-class="high-z-index-select"
+                  :teleported="true"
                 >
                   <el-option
                     v-for="item in returnList"
@@ -345,10 +388,12 @@
         <!-- 【抄送】按钮 -->
         <el-popover
           :visible="popOverVisible.copy"
-          placement="top-start"
-          :width="420"
+          :placement="popoverPlacement"
+          :width="popoverWidth"
           trigger="click"
           v-if="runningTask && isHandleTaskStatus() && isShowButton(OperationButtonType.COPY)"
+          :teleported="true"
+          :popper-style="popoverStyle"
         >
           <template #reference>
             <div @click="openPopover('copy')" class="secondary-action-btn">
@@ -371,7 +416,10 @@
                   clearable
                   style="width: 100%"
                   multiple
+                  filterable
                   placeholder="请选择抄送人"
+                  popper-class="high-z-index-select"
+                  :teleported="true"
                 >
                   <el-option
                     v-for="item in userOptions"
@@ -403,10 +451,12 @@
         <!-- 【转办】按钮 -->
         <el-popover
           :visible="popOverVisible.transfer"
-          placement="top-start"
-          :width="420"
+          :placement="popoverPlacement"
+          :width="popoverWidth"
           trigger="click"
           v-if="runningTask && isHandleTaskStatus() && isShowButton(OperationButtonType.TRANSFER)"
+          :teleported="true"
+          :popper-style="popoverStyle"
         >
           <template #reference>
             <div @click="openPopover('transfer')" class="secondary-action-btn">
@@ -429,6 +479,8 @@
                   clearable
                   style="width: 100%"
                   filterable
+                  popper-class="high-z-index-select"
+                  :teleported="true"
                 >
                   <el-option
                     v-for="item in userOptions"
@@ -460,10 +512,12 @@
         <!-- 【委派】按钮 -->
         <el-popover
           :visible="popOverVisible.delegate"
-          placement="top-start"
-          :width="420"
+          :placement="popoverPlacement"
+          :width="popoverWidth"
           trigger="click"
           v-if="runningTask && isHandleTaskStatus() && isShowButton(OperationButtonType.DELEGATE)"
+          :teleported="true"
+          :popper-style="popoverStyle"
         >
           <template #reference>
             <div @click="openPopover('delegate')" class="secondary-action-btn">
@@ -486,6 +540,8 @@
                   clearable
                   filterable
                   style="width: 100%"
+                  popper-class="high-z-index-select"
+                  :teleported="true"
                 >
                   <el-option
                     v-for="item in userOptions"
@@ -517,10 +573,12 @@
         <!-- 【加签】按钮 当前任务审批人为A，向前加签选了一个C，则需要C先审批，然后再是A审批，向后加签B，A审批完，需要B再审批完，才算完成这个任务节点 -->
         <el-popover
           :visible="popOverVisible.addSign"
-          placement="top-start"
-          :width="420"
+          :placement="popoverPlacement"
+          :width="popoverWidth"
           trigger="click"
           v-if="runningTask && isHandleTaskStatus() && isShowButton(OperationButtonType.ADD_SIGN)"
+          :teleported="true"
+          :popper-style="popoverStyle"
         >
           <template #reference>
             <div @click="openPopover('addSign')" class="secondary-action-btn">
@@ -528,21 +586,28 @@
               {{ getButtonDisplayName(OperationButtonType.ADD_SIGN) }}
             </div>
           </template>
-          <div class="flex flex-col flex-1 pt-20px px-20px" v-loading="formLoading">
+          <div class="flex flex-col flex-1" :class="isMobile ? 'pt-15px px-15px' : 'pt-20px px-20px'" v-loading="formLoading">
             <el-form
               label-position="top"
               class="mb-auto"
               ref="addSignFormRef"
               :model="addSignForm"
               :rules="addSignFormRule"
-              label-width="100px"
+              :label-width="isMobile ? 'auto' : '100px'"
             >
               <el-form-item label="加签处理人" prop="addSignUserIds">
                 <el-select
                   v-model="addSignForm.addSignUserIds"
                   multiple
+                  filterable
                   clearable
                   style="width: 100%"
+                  :collapse-tags="isMobile"
+                  :max-collapse-tags="isMobile ? 2 : 3"
+                  :placeholder="isMobile ? '选择处理人' : '请选择加签处理人'"
+                  :size="isMobile ? 'default' : 'default'"
+                  popper-class="high-z-index-select"
+                  :teleported="true"
                 >
                   <el-option
                     v-for="item in userOptions"
@@ -556,19 +621,43 @@
                 <el-input
                   v-model="addSignForm.reason"
                   clearable
-                  placeholder="请输入审批意见"
+                  :placeholder="isMobile ? '请输入意见' : '请输入审批意见'"
                   type="textarea"
-                  :rows="3"
+                  :rows="isMobile ? 3 : 3"
+                  :maxlength="200"
+                  show-word-limit
                 />
               </el-form-item>
-              <el-form-item>
-                <el-button :disabled="formLoading" type="primary" @click="handlerAddSign('before')">
-                  向前{{ getButtonDisplayName(OperationButtonType.ADD_SIGN) }}
-                </el-button>
-                <el-button :disabled="formLoading" type="primary" @click="handlerAddSign('after')">
-                  向后{{ getButtonDisplayName(OperationButtonType.ADD_SIGN) }}
-                </el-button>
-                <el-button @click="closePropover('addSign', addSignFormRef)"> 取消 </el-button>
+              <el-form-item class="add-sign-buttons">
+                <div :class="isMobile ? 'flex flex-col gap-2' : 'flex flex-wrap gap-2'">
+                  <el-button 
+                    :disabled="formLoading" 
+                    type="primary" 
+                    @click="handlerAddSign('before')"
+                    :class="isMobile ? 'w-full' : 'flex-1'"
+                    :size="isMobile ? 'default' : 'default'"
+                  >
+                    <Icon icon="ep:back" class="mr-1" :size="14" />
+                    向前{{ getButtonDisplayName(OperationButtonType.ADD_SIGN) }}
+                  </el-button>
+                  <el-button 
+                    :disabled="formLoading" 
+                    type="primary" 
+                    @click="handlerAddSign('after')"
+                    :class="isMobile ? 'w-full' : 'flex-1'"
+                    :size="isMobile ? 'default' : 'default'"
+                  >
+                    <Icon icon="ep:right" class="mr-1" :size="14" />
+                    向后{{ getButtonDisplayName(OperationButtonType.ADD_SIGN) }}
+                  </el-button>
+                  <el-button 
+                    @click="closePropover('addSign', addSignFormRef)" 
+                    :class="isMobile ? 'w-full' : ''"
+                    :size="isMobile ? 'default' : 'default'"
+                  >
+                    取消
+                  </el-button>
+                </div>
               </el-form-item>
             </el-form>
           </div>
@@ -577,10 +666,12 @@
         <!-- 【减签】按钮 -->
         <el-popover
           :visible="popOverVisible.deleteSign"
-          placement="top-start"
-          :width="420"
+          :placement="popoverPlacement"
+          :width="popoverWidth"
           trigger="click"
           v-if="runningTask?.children.length > 0"
+          :teleported="true"
+          :popper-style="popoverStyle"
         >
           <template #reference>
             <div @click="openPopover('deleteSign')" class="secondary-action-btn">
@@ -597,7 +688,13 @@
               label-width="100px"
             >
               <el-form-item label="减签人员" prop="deleteSignTaskId">
-                <el-select v-model="deleteSignForm.deleteSignTaskId" clearable style="width: 100%">
+                <el-select 
+                  v-model="deleteSignForm.deleteSignTaskId" 
+                  clearable 
+                  style="width: 100%"
+                  popper-class="high-z-index-select"
+                  :teleported="true"
+                >
                   <el-option
                     v-for="item in runningTask.children"
                     :key="item.id"
@@ -630,10 +727,12 @@
         <!-- 【退回】按钮 -->
         <el-popover
           :visible="popOverVisible.return"
-          placement="top-start"
-          :width="420"
+          :placement="popoverPlacement"
+          :width="popoverWidth"
           trigger="click"
           v-if="runningTask && isHandleTaskStatus() && isShowButton(OperationButtonType.RETURN)"
+          :teleported="true"
+          :popper-style="popoverStyle"
         >
           <template #reference>
             <div @click="openPopover('return')" class="secondary-action-btn action-return">
@@ -655,6 +754,8 @@
                   v-model="returnForm.targetTaskDefinitionKey"
                   clearable
                   style="width: 100%"
+                  popper-class="high-z-index-select"
+                  :teleported="true"
                 >
                   <el-option
                     v-for="item in returnList"
@@ -687,12 +788,14 @@
       <!--【取消】按钮 这个对应发起人的取消, 只有发起人可以取消 -->
       <el-popover
         :visible="popOverVisible.cancel"
-        placement="top-start"
-        :width="420"
+        :placement="popoverPlacement"
+        :width="popoverWidth"
         trigger="click"
         v-if="
           userId === processInstance?.startUser?.id && !isEndProcessStatus(processInstance?.status)
         "
+        :teleported="true"
+        :popper-style="popoverStyle"
       >
         <template #reference>
           <div @click="openPopover('cancel')" class="secondary-action-btn action-cancel">
@@ -741,39 +844,47 @@
         <Icon :size="16" icon="ep:refresh" class="action-icon" />&nbsp; 再次提交
       </div>
     </div>
+    </div>
   </div>
 
   <!-- 添加催办弹窗 -->
   <el-dialog
     v-model="urgeDialogVisible"
     title="催办处理"
-    width="450px"
+    :width="isMobile ? '95vw' : '450px'"
     :close-on-click-modal="false"
     append-to-body
+    :class="isMobile ? 'mobile-urge-dialog' : ''"
+    :top="isMobile ? '15vh' : '15vh'"
   >
     <div v-loading="urgeLoading">
       <el-alert
         title="催办将向当前审批人发送消息提醒"
         type="info"
         :closable="false"
-        class="mb-15px"
+        :class="isMobile ? 'mb-12px' : 'mb-15px'"
+        :show-icon="!isMobile"
       />
 
-      <div class="mb-15px">
-        <div class="font-bold mb-5px">当前审批人：</div>
-        <el-tag
-          v-for="user in currentApprovers"
-          :key="user.id"
-          class="mr-5px mb-5px"
-          closable
-          :disable-transitions="false"
-          @close="handleRemoveApprover(user)"
-        >
-          {{ user.nickname }}
-        </el-tag>
+      <div :class="isMobile ? 'mb-12px' : 'mb-15px'">
+        <div :class="isMobile ? 'font-bold mb-3px text-sm' : 'font-bold mb-5px'">当前审批人：</div>
+        <div :class="isMobile ? 'flex flex-wrap gap-2' : ''">
+          <el-tag
+            v-for="user in currentApprovers"
+            :key="user.id"
+            :class="isMobile ? 'text-xs' : 'mr-5px mb-5px'"
+            :size="isMobile ? 'small' : 'default'"
+            closable
+            :disable-transitions="false"
+            @close="handleRemoveApprover(user)"
+          >
+            {{ user.nickname }}
+          </el-tag>
+        </div>
         <el-empty
           v-if="!currentApprovers || currentApprovers.length === 0"
           description="暂无审批人"
+          :image-size="isMobile ? 60 : 80"
         />
       </div>
 
@@ -783,14 +894,32 @@
             v-model="urgeForm.urgeMessage"
             placeholder="请输入催办消息"
             type="textarea"
-            :rows="3"
+            :rows="isMobile ? 3 : 3"
+            :maxlength="200"
+            show-word-limit
           />
         </el-form-item>
       </el-form>
     </div>
     <template #footer>
-      <el-button @click="urgeDialogVisible = false">取消</el-button>
-      <el-button type="primary" @click="handleUrge" :loading="urgeLoading">发送催办</el-button>
+      <div :class="isMobile ? 'flex flex-col gap-2 w-full' : 'flex justify-end gap-3'">
+        <el-button 
+          @click="urgeDialogVisible = false"
+          :class="isMobile ? 'w-full order-2' : ''"
+          :size="isMobile ? 'large' : 'default'"
+        >
+          取消
+        </el-button>
+        <el-button 
+          type="primary" 
+          @click="handleUrge" 
+          :loading="urgeLoading"
+          :class="isMobile ? 'w-full order-1' : ''"
+          :size="isMobile ? 'large' : 'default'"
+        >
+          发送催办
+        </el-button>
+      </div>
     </template>
   </el-dialog>
 
@@ -824,7 +953,7 @@ const router = useRouter() // 路由
 const message = useMessage() // 消息弹窗
 
 const userId = useUserStoreWithOut().getUser.id // 当前登录的编号
-const emit = defineEmits(['success']) // 定义 success 事件，用于操作成功后的回调
+const emit = defineEmits(['success', 'button-area-visibility-change']) // 定义事件，用于操作成功后的回调和按钮区域可见性变化
 
 const props = defineProps<{
   processInstance: any // 流程实例信息
@@ -854,6 +983,80 @@ const popOverVisible = ref({
   urge: false, // 新增催办弹窗状态
   save: false // 新增暂存弹窗状态
 }) // 气泡卡是否展示
+
+// 响应式弹框配置
+const isMobile = ref(false)
+const isKeyboardOpen = ref(false) // 键盘是否弹出
+const viewportHeight = ref(window.innerHeight) // 视口高度
+const shouldHideButtonArea = ref(false) // 是否应该隐藏按钮区域
+const showMenu=ref(true);
+const popoverWidth = computed(() => isMobile.value ? '90vw' : '420px')
+// 动态调整弹框位置：键盘弹出时使用top，否则使用top-end
+const popoverPlacement = computed(() => {
+  if (isMobile.value) {
+    return isKeyboardOpen.value ? 'top' : 'top'
+  }
+  return 'top-end'
+})
+
+// 动态弹框样式，键盘弹出时调整位置
+const popoverStyle = computed(() => {
+  const baseStyle = { maxWidth: '95vw', zIndex: 9999 }
+  if (isMobile.value && isKeyboardOpen.value) {
+    // 键盘弹出时，将弹框定位到可视区域上方
+    const availableHeight = viewportHeight.value * 0.4 // 使用40%的可视高度
+    return {
+      ...baseStyle,
+      maxHeight: `${availableHeight}px`,
+      transform: 'translateY(-20px)', // 向上偏移
+      position: 'fixed',
+      top: '10px'
+    }
+  }
+  return baseStyle
+})
+
+// 检测设备类型
+const checkIsMobile = () => {
+  isMobile.value = window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+}
+
+// 检测键盘弹出状态
+const checkKeyboard = () => {
+  const currentHeight = window.innerHeight
+  const heightDiff = viewportHeight.value - currentHeight
+  
+  // 如果高度差超过150px，认为键盘弹出了
+  if (heightDiff > 150) {
+    if (!isKeyboardOpen.value) {
+      console.log('检测到键盘弹出')
+      isKeyboardOpen.value = true
+      // 移动端键盘弹出时隐藏按钮区域
+      if (isMobile.value) {
+        shouldHideButtonArea.value = true
+        console.log('移动端键盘弹出，隐藏按钮区域')
+      }
+    }
+  } else {
+    if (isKeyboardOpen.value) {
+      console.log('检测到键盘收起')
+      isKeyboardOpen.value = false
+      // 移动端键盘收起时显示按钮区域
+      if (isMobile.value) {
+        shouldHideButtonArea.value = false
+        console.log('移动端键盘收起，显示按钮区域')
+      }
+    }
+  }
+}
+
+// 监听窗口大小变化
+const handleResize = () => {
+  checkIsMobile()
+  checkKeyboard()
+}
+
+
 const returnList = ref([] as any) // 退回节点
 const adminStatus = ref(false) // 是否为管理员
 const currentNodes = ref([] as any) // 当前运行中的节点列表
@@ -1003,11 +1206,11 @@ const shouldShowAdminButtons = computed(() => {
   // 移除taskId限制，只要是管理员且流程未结束就显示管理员按钮
   const should = hasAdminStatus && notEndProcess
 
-/*  console.log('计算是否显示管理员按钮:', {
+  console.log('计算是否显示管理员按钮:', {
     hasAdminStatus,
     notEndProcess,
     result: should
-  })*/
+  })
 
   return should
 })
@@ -1016,7 +1219,7 @@ const shouldShowAdminButtons = computed(() => {
 const openPopover = async (type: string) => {
   // 检查文件是否正在上传
   if ((type === 'approve' || type === 'reject') && fileUploading.value) {
-  //  console.log('尝试打开审批弹窗，但有文件正在上传')
+    console.log('尝试打开审批弹窗，但有文件正在上传')
     message.warning('有文件正在上传，请等待上传完成后再操作')
     return
   }
@@ -1078,19 +1281,18 @@ const getTaskId = () => {
     message.error('未找到任务ID')
     return null
   }
-/*  console.log(
+  console.log(
     '获取任务ID:',
     taskId,
     '(来源:',
     urlTaskId ? 'URL' : router.currentRoute.value.query.taskId ? 'Router' : 'runningTask',
     ')'
-  )*/
+  )
   return taskId
 }
 
 /** 处理审批通过和不通过的操作 */
 const handleAudit = async (pass: boolean, formRef: FormInstance | undefined) => {
-/*
   console.log('触发审批操作，文件上传状态:', fileUploading.value)
   console.log('审批操作前状态 - 当前任务:', runningTask.value?.id)
   console.log(
@@ -1098,11 +1300,10 @@ const handleAudit = async (pass: boolean, formRef: FormInstance | undefined) => 
     new URL(window.location.href).searchParams.get('taskId')
   )
   console.log('审批操作前状态 - 路由中的taskId:', router.currentRoute.value.query.taskId)
-*/
 
   // 检查文件是否正在上传中
   if (fileUploading.value) {
-    // console.log('文件正在上传，阻止审批操作')
+    console.log('文件正在上传，阻止审批操作')
     message.warning('请等待文件上传完成后再审批')
     return
   }
@@ -1154,17 +1355,17 @@ const handleAudit = async (pass: boolean, formRef: FormInstance | undefined) => 
       }
       // 添加用户选择的审批人
       if (Object.keys(startUserSelectAssignees.value).length > 0) {
-        // console.log('添加自选审批人:', startUserSelectAssignees.value)
+        console.log('添加自选审批人:', startUserSelectAssignees.value)
         data.startUserSelectAssignees = startUserSelectAssignees.value
       }
-      //const response = await TaskApi.approveTask(data)
-/*      console.log('审批通过API响应:', response)
+      const response = await TaskApi.approveTask(data)
+      console.log('审批通过API响应:', response)
       console.log('审批通过后状态 - 当前任务:', runningTask.value?.id)
       console.log(
         '审批通过后状态 - URL中的taskId:',
         new URL(window.location.href).searchParams.get('taskId')
       )
-     // console.log('审批通过后状态 - 路由中的taskId:', router.currentRoute.value.query.taskId)*/
+      console.log('审批通过后状态 - 路由中的taskId:', router.currentRoute.value.query.taskId)
       popOverVisible.value.approve = false
       message.success('审批通过成功')
     } else {
@@ -1220,10 +1421,10 @@ const handleAudit = async (pass: boolean, formRef: FormInstance | undefined) => 
       
       // 如果不是钉钉环境，跳转到待办任务列表
       if (!isDingTalk) {
-      //  console.log('非钉钉环境，跳转到待办任务列表')
+        console.log('非钉钉环境，跳转到待办任务列表')
         await router.push({ path: '/bpm/task/todo' })
       } else {
-      //  console.log('钉钉环境，不进行跳转')
+        console.log('钉钉环境，不进行跳转')
       }
     }
   } finally {
@@ -1328,6 +1529,9 @@ const handlerAddSign = async (type: string) => {
     }
     await TaskApi.signCreateTask(data)
     message.success('操作成功')
+    if( type==="before"){
+      showMenu.value=false
+    }
     addSignFormRef.value.resetFields()
     popOverVisible.value.addSign = false
     // 2 加载最新数据
@@ -1434,11 +1638,11 @@ const reload = () => {
 /** 任务是否为处理中状态 */
 const isHandleTaskStatus = () => {
   let canHandle = false
-/*  console.log('检查任务状态:', {
+  console.log('检查任务状态:', {
     currentStatus: runningTask.value?.status,
     expectedStatus: TaskApi.TaskStatusEnum.RUNNING,
     runningTask: runningTask.value
-  })*/
+  })
   // 支持待审批(WAIT)和审批中(RUNNING)两种状态
   if (
     runningTask.value?.status === TaskApi.TaskStatusEnum.WAIT ||
@@ -1446,17 +1650,17 @@ const isHandleTaskStatus = () => {
   ) {
     canHandle = true
   }
-  // console.log('任务是否可处理:', canHandle)
+  console.log('任务是否可处理:', canHandle)
   return canHandle
 }
 
 /** 流程状态是否为结束状态 */
 const isEndProcessStatus = (status: number) => {
-  // console.log('检查流程是否结束 - 当前状态:', status)
+  console.log('检查流程是否结束 - 当前状态:', status)
 
   // 防止状态为undefined
   if (status === undefined || status === null) {
-  //  console.log('流程状态为空，视为未结束')
+    console.log('流程状态为空，视为未结束')
     return false
   }
 
@@ -1467,24 +1671,24 @@ const isEndProcessStatus = (status: number) => {
     BpmProcessInstanceStatus.CANCEL === status
   ) {
     isEndStatus = true
-    // console.log('流程已结束: 状态为审批通过/拒绝/取消')
+    console.log('流程已结束: 状态为审批通过/拒绝/取消')
   }
-  // console.log('isEndProcessStatus', isEndStatus)
+  console.log('isEndProcessStatus', isEndStatus)
   return isEndStatus
 }
 
 /** 是否显示按钮 */
 const isShowButton = (btnType: OperationButtonType): boolean => {
   let isShow = true
-/*  console.log('检查按钮显示权限:', {
+  console.log('检查按钮显示权限:', {
     btnType,
     buttonsSetting: runningTask.value?.buttonsSetting,
     specificSetting: runningTask.value?.buttonsSetting?.[btnType]
-  })*/
+  })
   if (runningTask.value?.buttonsSetting && runningTask.value?.buttonsSetting[btnType]) {
     isShow = runningTask.value.buttonsSetting[btnType].enable
   }
-  // console.log('按钮是否显示:', isShow)
+  console.log('按钮是否显示:', isShow)
   return isShow
 }
 
@@ -1529,13 +1733,13 @@ const validateNormalForm = async () => {
         .map((rule: { field: string }) => rule.field)
       if (validFields.length > 0) {
         // 只校验必填字段
-      //  console.log('validFields', validFields)
+        console.log('validFields', validFields)
         // 对每个字段单独进行校验
         for (const field of validFields) {
           await formInstance.validateField(field)
         }
       }
-    //  console.log('校验通过')
+      console.log('校验通过')
       debugger
       return true
     } catch {
@@ -1565,26 +1769,24 @@ const handleSignFinish = (url: string) => {
 const checkAdminStatus = async () => {
   try {
     // 调试信息：初始状态
-/*
     console.log(
       'checkAdminStatus 开始: adminStatus =',
       adminStatus.value,
       'props.isAdmin =',
       props.isAdmin
     )
-*/
 
     // 直接使用父组件传递的值，如果为undefined则设为false
     adminStatus.value = props.isAdmin || false
 
-    // console.log('设置 adminStatus 为:', adminStatus.value)
+    console.log('设置 adminStatus 为:', adminStatus.value)
   } catch (error) {
     console.error('获取管理员状态出错:', error)
     adminStatus.value = false
   }
 
   // 最终状态输出
-  // console.log('checkAdminStatus 结束: adminStatus =', adminStatus.value)
+  console.log('checkAdminStatus 结束: adminStatus =', adminStatus.value)
 }
 
 // ========== 监听器集中管理区域 ==========
@@ -1605,10 +1807,10 @@ watch(
 watch(
   () => props.processInstance,
   (newVal, oldVal) => {
-/*    console.log('流程实例数据变化:', {
+    console.log('流程实例数据变化:', {
       old: oldVal?.status,
       new: newVal?.status
-    })*/
+    })
 
     if (newVal) {
       // 流程状态变化时，刷新节点列表
@@ -1617,17 +1819,17 @@ watch(
         !router.currentRoute.value.query.taskId &&
         oldVal?.status !== newVal?.status
       ) {
-        // console.log('流程状态变化，重新获取节点列表')
+        console.log('流程状态变化，重新获取节点列表')
         fetchCurrentNodes()
       }
 
-/*      console.log('管理员按钮显示条件更新:', {
+      console.log('管理员按钮显示条件更新:', {
         adminStatus: adminStatus.value,
         noTaskId: !router.currentRoute.value.query.taskId,
         processInstanceStatus: newVal?.status,
         isEndProcess: isEndProcessStatus(newVal?.status),
         shouldShowAdminButtons: shouldShowAdminButtons.value
-      })*/
+      })
     }
   },
   { deep: true, immediate: true }
@@ -1637,18 +1839,30 @@ watch(
 watch(
   () => props.isAdmin,
   (newVal, oldVal) => {
- //   console.log('props.isAdmin变化:', oldVal, '->', newVal)
+    console.log('props.isAdmin变化:', oldVal, '->', newVal)
     
     // 只有当值不同时才更新，避免无限循环
     if (newVal !== adminStatus.value) {
-   //   console.log('更新adminStatus值:', adminStatus.value, '->', newVal)
+      console.log('更新adminStatus值:', adminStatus.value, '->', newVal)
       adminStatus.value = newVal || false
       
       // 如果成为管理员且没有taskId，获取节点列表
       if (newVal && !router.currentRoute.value.query.taskId) {
-       // console.log('成为管理员，获取节点列表')
+        console.log('成为管理员，获取节点列表')
         fetchCurrentNodes()
       }
+    }
+  },
+  { immediate: true }
+)
+
+// 监听 shouldHideButtonArea 的变化，向父组件发送事件
+watch(
+  () => shouldHideButtonArea.value,
+  (newVal) => {
+    if (isMobile.value) {
+      console.log('按钮区域可见性变化:', newVal ? '隐藏' : '显示')
+      emit('button-area-visibility-change', newVal)
     }
   },
   { immediate: true }
@@ -1665,17 +1879,17 @@ const fetchCurrentNodes = async () => {
       return
     }
 
-  //  console.log('获取当前流程节点列表, processInstanceId:', processInstanceId)
+    console.log('获取当前流程节点列表, processInstanceId:', processInstanceId)
     currentNodes.value = await ModelApi.currentNodeList(processInstanceId)
-   // console.log('获取到节点列表:', currentNodes.value?.length || 0, '个节点')
+    console.log('获取到节点列表:', currentNodes.value?.length || 0, '个节点')
 
     // 如果没有获取到节点，尝试再获取一次
     if (!currentNodes.value || currentNodes.value.length === 0) {
-    //  console.log('未获取到节点，将在500ms后重试')
+      console.log('未获取到节点，将在500ms后重试')
       setTimeout(async () => {
-   //     console.log('重新获取节点列表')
+        console.log('重新获取节点列表')
         currentNodes.value = await ModelApi.currentNodeList(processInstanceId)
-    //    console.log('重试后获取到节点列表:', currentNodes.value?.length || 0, '个节点')
+        console.log('重试后获取到节点列表:', currentNodes.value?.length || 0, '个节点')
       }, 500)
     }
   } catch (error) {
@@ -1766,42 +1980,199 @@ const handleAdminApprove = async () => {
   }
 }
 
+// 添加输入框聚焦处理
+const handleInputFocus = (event: Event) => {
+  if (!isMobile.value) return
+  
+  console.log('输入框获得焦点')
+  
+  // 延迟检测键盘状态，因为键盘弹出有动画
+  setTimeout(() => {
+    checkKeyboard()
+    // 如果检测到键盘弹出，滚动到输入框位置
+    if (isKeyboardOpen.value && event.target) {
+      const target = event.target as HTMLElement
+      target.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      })
+    }
+  }, 300)
+}
+
+// 添加输入框失焦处理
+const handleInputBlur = () => {
+  if (!isMobile.value) return
+  
+  console.log('输入框失去焦点')
+  
+  // 延迟检测键盘状态
+  setTimeout(() => {
+    checkKeyboard()
+  }, 300)
+}
+
+// 文档焦点进入处理函数
+const handleDocumentFocusIn = (event: FocusEvent) => {
+  if (!isMobile.value) return
+  
+  const target = event.target as HTMLElement
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.contentEditable === 'true')) {
+    console.log('检测到输入框获得焦点，准备隐藏按钮区域')
+    
+    // 检查是否是iOS设备
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    
+    // iOS设备立即隐藏，Android设备延迟检测
+    if (isIOS) {
+      shouldHideButtonArea.value = true
+      console.log('iOS设备输入框获得焦点，立即隐藏按钮区域')
+    } else {
+      // Android设备延迟检测
+      setTimeout(() => {
+        checkKeyboard()
+      }, 300)
+    }
+  }
+}
+
+// 文档焦点离开处理函数
+const handleDocumentFocusOut = (event: FocusEvent) => {
+  if (!isMobile.value) return
+  
+  const target = event.target as HTMLElement
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.contentEditable === 'true')) {
+    console.log('检测到输入框失去焦点')
+    
+    // 延迟检测，确保键盘完全收起
+    setTimeout(() => {
+      // 检查是否还有其他输入框处于焦点状态
+      const activeElement = document.activeElement as HTMLElement
+      const isInputActive = activeElement && (
+        activeElement.tagName === 'INPUT' || 
+        activeElement.tagName === 'TEXTAREA' || 
+        activeElement.contentEditable === 'true'
+      )
+      
+      if (!isInputActive) {
+        shouldHideButtonArea.value = false
+        isKeyboardOpen.value = false
+        console.log('所有输入框失去焦点，显示按钮区域')
+      }
+    }, 300)
+  }
+}
+
+// 增强的移动端输入法检测
+const enhancedKeyboardDetection = () => {
+  if (!isMobile.value) return
+  
+  // 监听focusin和focusout事件，这些事件在输入法弹出前触发
+  document.addEventListener('focusin', handleDocumentFocusIn)
+  document.addEventListener('focusout', handleDocumentFocusOut)
+}
+
 // 监听文件上传状态变化事件
 onMounted(async () => {
+  checkIsMobile()
+  viewportHeight.value = window.innerHeight // 初始化视口高度
+  
+  // 监听窗口大小变化（包括键盘弹出/收起）
+  window.addEventListener('resize', handleResize)
+  
+  // 监听视口变化（更准确的键盘检测）
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+      if (isMobile.value) {
+        const currentHeight = window.visualViewport!.height
+        const screenHeight = window.screen.height
+        const heightDiff = screenHeight - currentHeight
+        
+        if (heightDiff > 200) { // 键盘弹出
+          if (!isKeyboardOpen.value) {
+            console.log('通过visualViewport检测到键盘弹出')
+            isKeyboardOpen.value = true
+            shouldHideButtonArea.value = true
+            console.log('移动端键盘弹出，隐藏按钮区域')
+          }
+        } else { // 键盘收起
+          if (isKeyboardOpen.value) {
+            console.log('通过visualViewport检测到键盘收起')
+            isKeyboardOpen.value = false
+            shouldHideButtonArea.value = false
+            console.log('移动端键盘收起，显示按钮区域')
+          }
+        }
+      }
+    })
+  }
+  
+  // 初始化增强的键盘检测
+  enhancedKeyboardDetection()
+  
+  // 为所有输入框添加焦点事件监听
+  nextTick(() => {
+    const inputs = document.querySelectorAll('input, textarea, .el-select')
+    inputs.forEach(input => {
+      input.addEventListener('focus', handleInputFocus)
+      input.addEventListener('blur', handleInputBlur)
+    })
+  })
+  
   await checkAdminStatus();
-  // console.log('审批组件挂载，开始监听文件上传状态事件')
+  console.log('审批组件挂载，开始监听文件上传状态事件')
   emitter.on(UPLOAD_STATUS_EVENT, (uploading: boolean) => {
-/*    console.log(
+    console.log(
       '审批页面接收到文件上传状态变化:',
       uploading,
       '当前时间:',
       new Date().toLocaleTimeString()
-    )*/
+    )
     if (fileUploading.value !== uploading) {
-     // console.log('文件上传状态实际发生变化:', fileUploading.value, '->', uploading)
+      console.log('文件上传状态实际发生变化:', fileUploading.value, '->', uploading)
       fileUploading.value = uploading
 
       // 强制UI更新
       nextTick(() => {
-       // console.log('UI已更新，按钮禁用状态:', isApproveButtonDisabled.value ? '已禁用' : '未禁用')
+        console.log('UI已更新，按钮禁用状态:', isApproveButtonDisabled.value ? '已禁用' : '未禁用')
       })
     }
   })
 
   // 添加调试日志
-/*  console.log('组件初始化完成:', {
+  console.log('组件初始化完成:', {
     isAdmin: props.isAdmin,
     adminStatus: adminStatus.value,
     processInstanceId: router.currentRoute.value.query.id,
     taskId: router.currentRoute.value.query.taskId,
     processInstanceStatus: props.processInstance?.status,
     currentNodesLength: currentNodes.value?.length,
-    shouldShowAdminButtons: shouldShowAdminButtons.value
-  })*/
+    shouldShowAdminButtons: shouldShowAdminButtons.value,
+    isMobile: isMobile.value,
+    viewportHeight: viewportHeight.value
+  })
 })
 
 // 组件卸载时清除事件监听
 onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+  
+  // 清除visualViewport事件监听
+  if (window.visualViewport) {
+    window.visualViewport.removeEventListener('resize', checkKeyboard)
+  }
+  
+  // 移除输入框事件监听
+  const inputs = document.querySelectorAll('input, textarea, .el-select')
+  inputs.forEach(input => {
+    input.removeEventListener('focus', handleInputFocus)
+    input.removeEventListener('blur', handleInputBlur)
+  })
+  
+  // 清理增强键盘检测的事件监听器
+  document.removeEventListener('focusin', handleDocumentFocusIn)
+  document.removeEventListener('focusout', handleDocumentFocusOut)
+  
   emitter.off(UPLOAD_STATUS_EVENT)
 })
 
@@ -1810,7 +2181,7 @@ const startUserSelectAssignees = ref<Record<string, number[]>>({})
 
 /** 处理用户选择审批人 */
 const selectUserConfirm = (activityId: string, userList: any[]) => {
- // console.log('选择审批人:', activityId, userList)
+  console.log('选择审批人:', activityId, userList)
   // 将用户ID数组保存到startUserSelectAssignees
   startUserSelectAssignees.value[activityId] = userList?.map((item: any) => item.id)
 }
@@ -2001,7 +2372,7 @@ const handleSaveTaskForm = async () => {
       variables: variables
     }
 
-    //console.log('暂存表单数据:', data)
+    console.log('暂存表单数据:', data)
 
     // 调用暂存API
     await TaskApi.saveTaskForm(data)
@@ -2009,7 +2380,7 @@ const handleSaveTaskForm = async () => {
     // 关闭暂存对话框
     popOverVisible.value.save = false
   } catch (error) {
-    //console.error('暂存表单失败:', error)
+    console.error('暂存表单失败:', error)
     message.error('表单暂存失败: ' + (error.message || '未知错误'))
   } finally {
     formLoading.value = false
@@ -2283,8 +2654,53 @@ const handleSaveTaskForm = async () => {
   position: relative;
 }
 
+/* 触摸优化 */
+:deep(.el-button),
+.secondary-action-btn,
+.primary-action-btn {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* 移动端按钮点击反馈 */
+@media (hover: none) and (pointer: coarse) {
+  .secondary-action-btn:active,
+  .primary-action-btn:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
+  }
+  
+  :deep(.el-button:active) {
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
+  }
+}
+
+/* 移动端隐藏按钮区域的样式 */
+.mobile-hidden {
+  opacity: 0 !important;
+  transform: translateY(100%) !important;
+  transition: all 0.3s ease !important;
+  pointer-events: none !important;
+}
+
+/* 移动端键盘弹出时的平滑过渡 */
+.operations-panel {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* 移动端弹框全局优化 */
+:deep(.el-popper.is-light) {
+  border: 1px solid var(--el-border-color-light);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
 /* 移动端适配优化 */
-@media (max-width: 576px) {
+@media (max-width: 768px) {
   .operations-panel {
     padding: 8px 4px;
     gap: 8px;
@@ -2297,7 +2713,8 @@ const handleSaveTaskForm = async () => {
   .secondary-action-btn {
     padding: 5px 8px;
     font-size: 12px;
-
+    min-height: 36px;
+    
     .action-icon {
       font-size: 14px;
     }
@@ -2306,6 +2723,381 @@ const handleSaveTaskForm = async () => {
   .upload-indicator {
     padding: 5px 8px;
     font-size: 12px;
+  }
+  
+  /* 移动端弹框优化 */
+  :deep(.el-popover.el-popper) {
+    max-width: 95vw !important;
+    margin: 5px !important;
+    transform-origin: center top !important;
+    border-radius: 8px;
+    padding: 0 !important;
+  }
+  
+  /* 键盘弹出时的弹框样式优化 */
+  :deep(.el-popover.el-popper) {
+    &.keyboard-open {
+      position: fixed !important;
+      top: 10px !important;
+      left: 50% !important;
+      transform: translateX(-50%) !important;
+      max-height: 40vh !important;
+      overflow-y: auto !important;
+      z-index: 10001 !important;
+    }
+  }
+  
+  /* 移动端表单优化 */
+  :deep(.el-form-item) {
+    margin-bottom: 15px;
+    
+    .el-form-item__label {
+      font-size: 14px;
+      margin-bottom: 6px;
+      line-height: 1.4;
+    }
+    
+    .el-form-item__content {
+      line-height: 1.4;
+    }
+  }
+  
+  /* 移动端按钮优化 */
+  :deep(.el-button) {
+    min-height: 40px;
+    font-size: 14px;
+    padding: 10px 15px;
+    
+    &.w-full {
+      width: 100%;
+    }
+  }
+  
+  /* 移动端输入框优化 */
+  :deep(.el-input__wrapper) {
+    min-height: 36px;
+  }
+  
+  :deep(.el-textarea__inner) {
+    min-height: 80px;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  
+  /* 移动端选择框优化 */
+  :deep(.el-select) {
+    .el-input__wrapper {
+      min-height: 36px;
+    }
+  }
+  
+  /* 键盘弹出时的输入框优化 */
+  .keyboard-open {
+    :deep(.el-input__wrapper),
+    :deep(.el-textarea__inner) {
+      font-size: 16px !important; /* 防止iOS缩放 */
+    }
+    
+    :deep(.el-select) {
+      .el-input__wrapper {
+        font-size: 16px !important;
+      }
+    }
+    
+    /* 弹框内容滚动优化 */
+    :deep(.el-popover__content) {
+      max-height: 35vh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    /* 弹框表单内容优化 */
+    .popover-form-content {
+      max-height: 30vh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      
+      :deep(.el-form-item) {
+        margin-bottom: 12px;
+        
+        .el-form-item__label {
+          margin-bottom: 4px;
+          font-size: 13px;
+        }
+      }
+      
+      :deep(.el-input__wrapper),
+      :deep(.el-textarea__inner) {
+        font-size: 16px !important; /* 防止iOS自动缩放 */
+      }
+      
+      :deep(.el-button) {
+        min-height: 36px;
+        font-size: 14px;
+      }
+    }
+  }
+  
+  /* 移动端对话框优化 */
+  :deep(.el-dialog) {
+    width: 95vw !important;
+    margin: 0 auto;
+    
+    .el-dialog__header {
+      padding: 15px 20px 10px;
+    }
+    
+    .el-dialog__body {
+      padding: 10px 20px 20px;
+    }
+  }
+  
+  /* 催办弹框移动端优化 */
+  .mobile-urge-dialog {
+    :deep(.el-dialog__header) {
+      padding: 12px 16px 8px;
+      border-bottom: 1px solid var(--el-border-color-light);
+      
+      .el-dialog__title {
+        font-size: 16px;
+        font-weight: 600;
+      }
+      
+      .el-dialog__headerbtn {
+        top: 12px;
+        right: 12px;
+        width: 32px;
+        height: 32px;
+        
+        .el-dialog__close {
+          font-size: 18px;
+        }
+      }
+    }
+    
+    :deep(.el-dialog__body) {
+      padding: 16px;
+      max-height: 60vh;
+      overflow-y: auto;
+    }
+    
+    :deep(.el-dialog__footer) {
+      padding: 12px 16px;
+      border-top: 1px solid var(--el-border-color-light);
+    }
+    
+    /* 催办弹框内容优化 */
+    :deep(.el-alert) {
+      border-radius: 6px;
+      
+      .el-alert__title {
+        font-size: 13px;
+        line-height: 1.4;
+      }
+    }
+    
+    :deep(.el-tag) {
+      margin-right: 6px;
+      margin-bottom: 6px;
+      border-radius: 12px;
+      
+      &.el-tag--small {
+        height: 24px;
+        line-height: 22px;
+        font-size: 12px;
+        padding: 0 8px;
+      }
+      
+      .el-tag__close {
+        margin-left: 4px;
+        font-size: 12px;
+      }
+    }
+    
+    :deep(.el-empty) {
+      padding: 20px 0;
+      
+      .el-empty__description {
+        font-size: 13px;
+        color: var(--el-text-color-secondary);
+      }
+    }
+    
+    :deep(.el-form-item__label) {
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 6px;
+    }
+    
+    :deep(.el-textarea) {
+      .el-textarea__inner {
+        font-size: 14px;
+        line-height: 1.5;
+        border-radius: 6px;
+        min-height: 72px;
+      }
+    }
+    
+    :deep(.el-input__count) {
+      font-size: 12px;
+    }
+  }
+}
+
+/* 催办按钮样式优化 */
+.action-urge {
+  .action-icon {
+    color: #ff9800;
+  }
+
+  &:hover {
+    color: #ff9800;
+    background-color: rgba(255, 152, 0, 0.1);
+  }
+  
+  /* 移动端点击优化 */
+  @media (hover: none) and (pointer: coarse) {
+    &:active {
+      background-color: rgba(255, 152, 0, 0.15);
+      transform: scale(0.98);
+    }
+  }
+}
+
+/* 修复选择器z-index问题 */
+.high-z-index-select {
+  z-index: 10000 !important;
+}
+
+/* 全局选择器下拉框优化 */
+:deep(.el-select-dropdown) {
+  z-index: 10000 !important;
+}
+
+:deep(.el-popper.is-light) {
+  z-index: 10000 !important;
+}
+
+/* 确保所有弹出层都有足够高的z-index */
+:deep(.el-overlay) {
+  z-index: 9999 !important;
+}
+
+:deep(.el-popper) {
+  z-index: 10000 !important;
+}
+
+/* 特别处理选择器的下拉菜单 */
+:global(.el-select-dropdown) {
+  z-index: 10000 !important;
+}
+
+:global(.el-popper) {
+  z-index: 10000 !important;
+}
+
+/* 移动端选择器特殊处理 */
+@media (max-width: 768px) {
+  .high-z-index-select {
+    z-index: 10001 !important;
+    
+    /* 确保下拉框在移动端正确显示 */
+    &.el-select-dropdown {
+      max-height: 200px;
+      overflow-y: auto;
+    }
+  }
+  
+  /* 移动端多选标签优化 */
+  :deep(.el-select.is-multiple .el-select__tags) {
+    z-index: 1;
+    position: relative;
+  }
+}
+
+/* 加签弹框移动端优化 */
+@media (max-width: 768px) {
+  /* 加签多选框优化 */
+  :deep(.el-select.is-multiple) {
+    .el-select__tags {
+      max-height: 60px;
+      overflow-y: auto;
+      
+      .el-tag {
+        margin: 2px 4px 2px 0;
+        max-width: 120px;
+        
+        .el-tag__content {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        
+        .el-tag__close {
+          margin-left: 4px;
+        }
+      }
+      
+      .el-tag.el-tag--info {
+        background-color: var(--el-color-info-light-9);
+        border-color: var(--el-color-info-light-7);
+        color: var(--el-color-info);
+        
+        .el-tag__close:hover {
+          background-color: var(--el-color-info);
+          color: #fff;
+        }
+      }
+    }
+    
+    .el-select__input {
+      margin-left: 8px;
+      flex: 1;
+      min-width: 60px;
+    }
+  }
+  
+  /* 加签按钮组优化 */
+  .operations-panel {
+    :deep(.el-button-group) {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      
+      .el-button {
+        border-radius: 6px;
+        margin: 0 0 8px 0;
+        
+        &:last-child {
+          margin-bottom: 0;
+        }
+      }
+    }
+  }
+  
+  /* 加签表单项优化 */
+  :deep(.el-form-item) {
+    &.add-sign-buttons {
+      .el-form-item__content {
+        flex-direction: column;
+        align-items: stretch;
+        
+        .el-button {
+          margin: 0 0 8px 0;
+          width: 100%;
+          justify-content: center;
+          
+          &:last-child {
+            margin-bottom: 0;
+          }
+          
+          /* 按钮图标优化 */
+          .el-icon {
+            margin-right: 6px;
+          }
+        }
+      }
+    }
   }
 }
 </style>

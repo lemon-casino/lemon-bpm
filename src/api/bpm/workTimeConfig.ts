@@ -48,7 +48,7 @@ export const getWorkTimeConfigPage = (params: any) => {
 }
 
 // 新增工作时间配置
-export const createWorkTimeConfig = (data: WorkTimeConfigSaveReqVO) => {
+export const createWorkTimeConfig = (data) => {
   return request.post({ url: '/bpm/work-time-config/create', data })
 }
 

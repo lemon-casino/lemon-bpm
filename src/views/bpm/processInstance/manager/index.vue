@@ -112,8 +112,8 @@
 
   <!-- 实例模式列表 -->
   <ContentWrap v-if="viewMode === 'instance'">
-    <el-table 
-      v-loading="loading" 
+    <el-table
+      v-loading="loading"
       :data="list"
       border
       stripe
@@ -282,276 +282,276 @@
         :show-overflow-tooltip="false"
       >
         <el-table-column type="expand">
-        <template #default="props">
-          <el-descriptions title="流程实例详情" :column="3" border>
-            <el-descriptions-item label="流程编号" :span="3">{{ props.row.id }}</el-descriptions-item>
+          <template #default="props">
+            <el-descriptions title="流程实例详情" :column="3" border>
+              <el-descriptions-item label="流程编号" :span="3">{{ props.row.id }}</el-descriptions-item>
 
-            <el-descriptions-item label="流程名称">{{ props.row.name }}</el-descriptions-item>
-            <el-descriptions-item label="流程分类">{{ props.row.categoryName }}</el-descriptions-item>
-            <el-descriptions-item label="流程状态">
-              <dict-tag :type="DICT_TYPE.BPM_PROCESS_INSTANCE_STATUS" :value="props.row.status" />
-            </el-descriptions-item>
-            <el-descriptions-item label="发起人">{{ props.row.startUser?.nickname }}</el-descriptions-item>
-            <el-descriptions-item label="发起部门">{{ props.row.startUser?.deptName }}</el-descriptions-item>
-            <el-descriptions-item label="发起时间">{{ dateFormatter(null, null, props.row.startTime) }}</el-descriptions-item>
-            <el-descriptions-item label="结束时间">{{ props.row.endTime ? dateFormatter(null, null, props.row.endTime) : '-' }}</el-descriptions-item>
-            <el-descriptions-item label="当前任务" :span="1">
-              <el-tag
-                v-for="task in props.row.tasks"
-                :key="task.id"
-                type="success"
-                class="mr-5px mb-5px"
-              >
-                {{ task.name }}
-              </el-tag>
-              <span v-if="!props.row.tasks || props.row.tasks.length === 0">-</span>
-            </el-descriptions-item>
-            <el-descriptions-item label="运行时长" :span="1">
-              <div v-if="props.row.tasks && props.row.tasks.length > 0">
-                <div v-for="task in props.row.tasks" :key="task.id" class="mb-5px">
-                  {{ task.name }}: {{ calculateTaskRunningTime(task.createTime) }}
-                  <el-tooltip :content="formatTaskCreateTime(task.createTime)" placement="top">
-                    <Icon icon="ep:info-filled" class="ml-5px text-gray-400" />
-                  </el-tooltip>
-                </div>
-              </div>
-              <span v-else>-</span>
-            </el-descriptions-item>
-            <el-descriptions-item label="运行时间" :span="1">
-              <div v-if="props.row.tasks && props.row.tasks.length > 0">
-                <div v-for="task in props.row.tasks" :key="task.id" class="mb-5px">
-                  {{ task.name }}: {{ formatTaskCreateTime(task.createTime) }}
-                </div>
-              </div>
-              <span v-else>-</span>
-            </el-descriptions-item>
-            <el-descriptions-item label="版本号" :span="1">{{ props.row.processDefinitionId ? props.row.processDefinitionId.split(':')[1] : '-' }}</el-descriptions-item>
-          </el-descriptions>
-        </template>
-      </el-table-column>
-      <el-table-column type="index" width="50" fixed="left" />
-      <el-table-column label="流程名称" align="center" prop="name" min-width="200px" show-overflow-tooltip fixed="left" />
-      <el-table-column
-        label="流程分类"
-        align="center"
-        prop="categoryName"
-        width="100"
-        fixed="left"
-      />
-      <!-- 版本号列移到右侧 -->
-      <el-table-column label="流程发起人" align="center" prop="startUser.nickname" width="120" />
-      <el-table-column label="流程状态" prop="status" width="100" align="center">
-        <template #default="scope">
-          <dict-tag :type="DICT_TYPE.BPM_PROCESS_INSTANCE_STATUS" :value="scope.row.status" />
-        </template>
-      </el-table-column>
-      <el-table-column
-        label="发起时间"
-        align="center"
-        prop="startTime"
-        width="160"
-        :formatter="dateFormatter"
-        sortable
-      />
-      <!-- 表单变量展示 -->
-      <template v-if="summaryColumns.length > 0">
-        <el-table-column 
-          v-for="column in summaryColumns" 
-          :key="column.key" 
-          :label="column.key" 
-          align="center" 
-          :min-width="getColumnWidth(column)"
-          show-overflow-tooltip
-          :class-name="getColumnClass(column)"
-        >
-          <template #header="{ column: headerColumn }">
-            <div class="column-header">
-              <span class="column-title">{{ headerColumn.label }}</span>
-              <el-tooltip v-if="getColumnTooltip(column)" :content="getColumnTooltip(column)" placement="top">
-                <Icon icon="ep:info-filled" class="ml-5px text-gray-400 text-xs" />
-              </el-tooltip>
-            </div>
-          </template>
-          <template #default="scope">
-            <!-- 子表单数据展示 -->
-            <template v-if="column.isSubform">
-              <el-popover
-                placement="right"
-                :width="600"
-                trigger="hover"
-                :title="column.key"
-              >
-                <template #reference>
-                  <el-button type="primary" link @click.stop="handleViewSubform(scope.row, column.key)">
-                    查看详情 <el-badge :value="getSubformItemsCount(scope.row, column.key)" type="info" />
-                  </el-button>
-                </template>
-                <div style="max-height: 300px; overflow-y: auto;">
-                  <el-table
-                    :data="getSubformData(scope.row, column.key).slice(0, 5)"
-                    border
-                    stripe
-                    size="small"
-                    style="width: 100%"
-                  >
-                    <el-table-column
-                      v-for="subColumn in column.subColumns"
-                      :key="subColumn"
-                      :prop="subColumn"
-                      :label="subColumn"
-                      min-width="150"
-                      show-overflow-tooltip
-                    />
-                  </el-table>
-                  <div v-if="getSubformItemsCount(scope.row, column.key) > 5" class="text-center py-10px">
-                    <el-button type="primary" link @click.stop="handleViewSubform(scope.row, column.key)">
-                      查看全部 {{ getSubformItemsCount(scope.row, column.key) }} 条数据
-                    </el-button>
+              <el-descriptions-item label="流程名称">{{ props.row.name }}</el-descriptions-item>
+              <el-descriptions-item label="流程分类">{{ props.row.categoryName }}</el-descriptions-item>
+              <el-descriptions-item label="流程状态">
+                <dict-tag :type="DICT_TYPE.BPM_PROCESS_INSTANCE_STATUS" :value="props.row.status" />
+              </el-descriptions-item>
+              <el-descriptions-item label="发起人">{{ props.row.startUser?.nickname }}</el-descriptions-item>
+              <el-descriptions-item label="发起部门">{{ props.row.startUser?.deptName }}</el-descriptions-item>
+              <el-descriptions-item label="发起时间">{{ dateFormatter(null, null, props.row.startTime) }}</el-descriptions-item>
+              <el-descriptions-item label="结束时间">{{ props.row.endTime ? dateFormatter(null, null, props.row.endTime) : '-' }}</el-descriptions-item>
+              <el-descriptions-item label="当前任务" :span="1">
+                <el-tag
+                  v-for="task in props.row.tasks"
+                  :key="task.id"
+                  type="success"
+                  class="mr-5px mb-5px"
+                >
+                  {{ task.name }}
+                </el-tag>
+                <span v-if="!props.row.tasks || props.row.tasks.length === 0">-</span>
+              </el-descriptions-item>
+              <el-descriptions-item label="运行时长" :span="1">
+                <div v-if="props.row.tasks && props.row.tasks.length > 0">
+                  <div v-for="task in props.row.tasks" :key="task.id" class="mb-5px">
+                    {{ task.name }}: {{ calculateTaskRunningTime(task.createTime) }}
+                    <el-tooltip :content="formatTaskCreateTime(task.createTime)" placement="top">
+                      <Icon icon="ep:info-filled" class="ml-5px text-gray-400" />
+                    </el-tooltip>
                   </div>
                 </div>
-              </el-popover>
+                <span v-else>-</span>
+              </el-descriptions-item>
+              <el-descriptions-item label="运行时间" :span="1">
+                <div v-if="props.row.tasks && props.row.tasks.length > 0">
+                  <div v-for="task in props.row.tasks" :key="task.id" class="mb-5px">
+                    {{ task.name }}: {{ formatTaskCreateTime(task.createTime) }}
+                  </div>
+                </div>
+                <span v-else>-</span>
+              </el-descriptions-item>
+              <el-descriptions-item label="版本号" :span="1">{{ props.row.processDefinitionId ? props.row.processDefinitionId.split(':')[1] : '-' }}</el-descriptions-item>
+            </el-descriptions>
+          </template>
+        </el-table-column>
+        <el-table-column type="index" width="50" fixed="left" />
+        <el-table-column label="流程名称" align="center" prop="name" min-width="200px" show-overflow-tooltip fixed="left" />
+        <el-table-column
+          label="流程分类"
+          align="center"
+          prop="categoryName"
+          width="100"
+          fixed="left"
+        />
+        <!-- 版本号列移到右侧 -->
+        <el-table-column label="流程发起人" align="center" prop="startUser.nickname" width="120" />
+        <el-table-column label="流程状态" prop="status" width="100" align="center">
+          <template #default="scope">
+            <dict-tag :type="DICT_TYPE.BPM_PROCESS_INSTANCE_STATUS" :value="scope.row.status" />
+          </template>
+        </el-table-column>
+        <el-table-column
+          label="发起时间"
+          align="center"
+          prop="startTime"
+          width="160"
+          :formatter="dateFormatter"
+          sortable
+        />
+        <!-- 表单变量展示 -->
+        <template v-if="summaryColumns.length > 0">
+          <el-table-column
+            v-for="column in summaryColumns"
+            :key="column.key"
+            :label="column.key"
+            align="center"
+            :min-width="getColumnWidth(column)"
+            show-overflow-tooltip
+            :class-name="getColumnClass(column)"
+          >
+            <template #header="{ column: headerColumn }">
+              <div class="column-header">
+                <span class="column-title">{{ headerColumn.label }}</span>
+                <el-tooltip v-if="getColumnTooltip(column)" :content="getColumnTooltip(column)" placement="top">
+                  <Icon icon="ep:info-filled" class="ml-5px text-gray-400 text-xs" />
+                </el-tooltip>
+              </div>
             </template>
-            <!-- 普通字段展示 -->
-            <template v-else>
-              <div class="field-content">
-                <template v-if="isArrayField(scope.row, column.key)">
-                  <!-- 数组字段特殊处理 -->
-                  <el-popover
-                    placement="top"
-                    :width="400"
-                    trigger="hover"
-                    :title="`${column.key} 完整内容`"
-                  >
-                    <template #reference>
+            <template #default="scope">
+              <!-- 子表单数据展示 -->
+              <template v-if="column.isSubform">
+                <el-popover
+                  placement="right"
+                  :width="600"
+                  trigger="hover"
+                  :title="column.key"
+                >
+                  <template #reference>
+                    <el-button type="primary" link @click.stop="handleViewSubform(scope.row, column.key)">
+                      查看详情 <el-badge :value="getSubformItemsCount(scope.row, column.key)" type="info" />
+                    </el-button>
+                  </template>
+                  <div style="max-height: 300px; overflow-y: auto;">
+                    <el-table
+                      :data="getSubformData(scope.row, column.key).slice(0, 5)"
+                      border
+                      stripe
+                      size="small"
+                      style="width: 100%"
+                    >
+                      <el-table-column
+                        v-for="subColumn in column.subColumns"
+                        :key="subColumn"
+                        :prop="subColumn"
+                        :label="subColumn"
+                        min-width="150"
+                        show-overflow-tooltip
+                      />
+                    </el-table>
+                    <div v-if="getSubformItemsCount(scope.row, column.key) > 5" class="text-center py-10px">
+                      <el-button type="primary" link @click.stop="handleViewSubform(scope.row, column.key)">
+                        查看全部 {{ getSubformItemsCount(scope.row, column.key) }} 条数据
+                      </el-button>
+                    </div>
+                  </div>
+                </el-popover>
+              </template>
+              <!-- 普通字段展示 -->
+              <template v-else>
+                <div class="field-content">
+                  <template v-if="isArrayField(scope.row, column.key)">
+                    <!-- 数组字段特殊处理 -->
+                    <el-popover
+                      placement="top"
+                      :width="400"
+                      trigger="hover"
+                      :title="`${column.key} 完整内容`"
+                    >
+                      <template #reference>
                       <span class="array-field-content" :class="{'empty-value': !getDisplayValue(scope.row, column.key) || getDisplayValue(scope.row, column.key) === '-'}">
                         {{ getDisplayValue(scope.row, column.key) }}
                         <Icon icon="ep:list" class="ml-5px text-blue-500 text-xs" />
                       </span>
-                    </template>
-                    <div class="array-content-detail">
-                      <ul class="list-disc list-inside space-y-1">
-                        <li v-for="(item, index) in getArrayFieldData(scope.row, column.key)" :key="index" class="text-sm">
-                          {{ item }}
-                        </li>
-                      </ul>
-                    </div>
-                  </el-popover>
-                </template>
-                <template v-else>
-                  <!-- 普通字段 -->
-                  <span :class="{'empty-value': !getDisplayValue(scope.row, column.key) || getDisplayValue(scope.row, column.key) === '-'}">
+                      </template>
+                      <div class="array-content-detail">
+                        <ul class="list-disc list-inside space-y-1">
+                          <li v-for="(item, index) in getArrayFieldData(scope.row, column.key)" :key="index" class="text-sm">
+                            {{ item }}
+                          </li>
+                        </ul>
+                      </div>
+                    </el-popover>
+                  </template>
+                  <template v-else>
+                    <!-- 普通字段 -->
+                    <span :class="{'empty-value': !getDisplayValue(scope.row, column.key) || getDisplayValue(scope.row, column.key) === '-'}">
                     {{ getDisplayValue(scope.row, column.key) }}
                   </span>
-                  <el-tooltip v-if="isLongContent(getDisplayValue(scope.row, column.key))" :content="getDisplayValue(scope.row, column.key)" placement="top">
-                    <Icon icon="ep:more-filled" class="ml-5px text-gray-400 text-xs cursor-pointer" />
-                  </el-tooltip>
-                </template>
-              </div>
+                    <el-tooltip v-if="isLongContent(getDisplayValue(scope.row, column.key))" :content="getDisplayValue(scope.row, column.key)" placement="top">
+                      <Icon icon="ep:more-filled" class="ml-5px text-gray-400 text-xs cursor-pointer" />
+                    </el-tooltip>
+                  </template>
+                </div>
+              </template>
             </template>
+          </el-table-column>
+        </template>
+        <!-- 当前审批任务列 -->
+        <el-table-column label="当前审批任务" align="center" min-width="120px">
+          <template #default="scope">
+            <el-button type="primary" v-for="task in scope.row.tasks" :key="task.id" link>
+              <span>{{ task.name }}</span>
+            </el-button>
+            <span v-if="!scope.row.tasks || scope.row.tasks.length === 0">-</span>
           </template>
         </el-table-column>
-      </template>
-      <!-- 当前审批任务列 -->
-      <el-table-column label="当前审批任务" align="center" min-width="120px">
-        <template #default="scope">
-          <el-button type="primary" v-for="task in scope.row.tasks" :key="task.id" link>
-            <span>{{ task.name }}</span>
-          </el-button>
-          <span v-if="!scope.row.tasks || scope.row.tasks.length === 0">-</span>
-        </template>
-      </el-table-column>
-      <!-- 运行时长列 -->
-      <el-table-column label="运行时长" align="center" min-width="180px">
-        <template #default="scope">
-          <div v-if="scope.row.tasks && scope.row.tasks.length > 0">
-            <div v-for="task in scope.row.tasks" :key="task.id" class="mb-5px">
-              <el-tooltip :content="formatTaskCreateTime(task.createTime)" placement="top">
-                <span>{{ task.name }}: {{ calculateTaskRunningTime(task.createTime) }}</span>
-              </el-tooltip>
+        <!-- 运行时长列 -->
+        <el-table-column label="运行时长" align="center" min-width="180px">
+          <template #default="scope">
+            <div v-if="scope.row.tasks && scope.row.tasks.length > 0">
+              <div v-for="task in scope.row.tasks" :key="task.id" class="mb-5px">
+                <el-tooltip :content="formatTaskCreateTime(task.createTime)" placement="top">
+                  <span>{{ task.name }}: {{ calculateTaskRunningTime(task.createTime) }}</span>
+                </el-tooltip>
+              </div>
             </div>
-          </div>
-          <span v-else>-</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="运行时间" align="center" min-width="180px">
-        <template #default="scope">
-          <div v-if="scope.row.tasks && scope.row.tasks.length > 0">
-            <div v-for="task in scope.row.tasks" :key="task.id" class="mb-5px">
-              <span>{{ task.name }}: {{ formatTaskCreateTime(task.createTime) }}</span>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="运行时间" align="center" min-width="180px">
+          <template #default="scope">
+            <div v-if="scope.row.tasks && scope.row.tasks.length > 0">
+              <div v-for="task in scope.row.tasks" :key="task.id" class="mb-5px">
+                <span>{{ task.name }}: {{ formatTaskCreateTime(task.createTime) }}</span>
+              </div>
             </div>
-          </div>
-          <span v-else>-</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="流程编号" align="center" prop="id" min-width="300px" />
-      <el-table-column
-        label="版本号"
-        align="center"
-        width="80"
-        fixed="right"
-      >
-        <template #default="scope">
-          {{ scope.row.processDefinitionId ? scope.row.processDefinitionId.split(':')[1] : '-' }}
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" align="center" fixed="right" width="200">
-        <template #default="scope">
-          <div class="flex flex-col space-y-1">
-            <div>
-              <el-button
-                link
-                type="primary"
-                size="small"
-                @click="handleDetail(scope.row)"
-              >
-                详情
-              </el-button>
-              <el-button
-                link
-                type="primary"
-                size="small"
-                @click="handleViewVariables(scope.row)"
-              >
-                变量
-              </el-button>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="流程编号" align="center" prop="id" min-width="300px" />
+        <el-table-column
+          label="版本号"
+          align="center"
+          width="80"
+          fixed="right"
+        >
+          <template #default="scope">
+            {{ scope.row.processDefinitionId ? scope.row.processDefinitionId.split(':')[1] : '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" align="center" fixed="right" width="200">
+          <template #default="scope">
+            <div class="flex flex-col space-y-1">
+              <div>
+                <el-button
+                  link
+                  type="primary"
+                  size="small"
+                  @click="handleDetail(scope.row)"
+                >
+                  详情
+                </el-button>
+                <el-button
+                  link
+                  type="primary"
+                  size="small"
+                  @click="handleViewVariables(scope.row)"
+                >
+                  变量
+                </el-button>
+              </div>
+              <div>
+                <el-button
+                  link
+                  type="danger"
+                  size="small"
+                  v-if="scope.row.status === 1"
+                  v-hasPermi="['bpm:process-instance:query']"
+                  @click="handleCancel(scope.row)"
+                >
+                  取消
+                </el-button>
+                <el-button
+                  link
+                  type="danger"
+                  size="small"
+                  v-hasPermi="['bpm:process-instance:delete']"
+                  @click="handleDelete(scope.row)"
+                >
+                  删除
+                </el-button>
+              </div>
             </div>
-            <div>
-              <el-button
-                link
-                type="danger"
-                size="small"
-                v-if="scope.row.status === 1"
-                v-hasPermi="['bpm:process-instance:query']"
-                @click="handleCancel(scope.row)"
-              >
-                取消
-              </el-button>
-              <el-button
-                link
-                type="danger"
-                size="small"
-                v-hasPermi="['bpm:process-instance:delete']"
-                @click="handleDelete(scope.row)"
-              >
-                删除
-              </el-button>
-            </div>
-          </div>
-        </template>
-      </el-table-column>
-    </el-table>
-    
+          </template>
+        </el-table-column>
+      </el-table>
 
-  </div>
-  
-  <!-- 分页 -->
-  <Pagination
-    :total="total"
-    v-model:page="queryParams.pageNo"
-    v-model:limit="queryParams.pageSize"
-    @pagination="getList"
-  />
-</ContentWrap>
+
+    </div>
+
+    <!-- 分页 -->
+    <Pagination
+      :total="total"
+      v-model:page="queryParams.pageNo"
+      v-model:limit="queryParams.pageSize"
+      @pagination="getList"
+    />
+  </ContentWrap>
 
   <!-- 变量查看对话框 -->
   <Dialog v-model="variablesDialogVisible" title="流程变量详情" width="60%">
@@ -882,9 +882,9 @@ const tableHeight = computed(() => {
   const statusHeight = 40 // 优化后的状态栏高度
   const paginationHeight = 60 // 分页高度
   const padding = 40 // 页面内边距
-  
+
   const calculatedHeight = windowHeight - headerHeight - searchFormHeight - statusHeight - paginationHeight - padding
-  
+
   // 确保最小高度550px，最大高度没有限制，让表格充分利用空间
   return Math.max(550, calculatedHeight)
 })
@@ -946,10 +946,10 @@ const extractSummaryColumns = (dataList: ProcessInstanceItem[]) => {
       item.formVariablesDisplay.forEach(display => {
         if (display.key && !display.key.startsWith('PROCESS_') && display.key.trim() !== '') {
           // 检查字段是否有有效值
-          const hasValidValue = display.value !== null && 
-                               display.value !== undefined && 
-                               display.value !== '' &&
-                               !(Array.isArray(display.value) && display.value.length === 0)
+          const hasValidValue = display.value !== null &&
+            display.value !== undefined &&
+            display.value !== '' &&
+            !(Array.isArray(display.value) && display.value.length === 0)
 
           // 只有有效值的字段才添加到columns
           if (hasValidValue) {
@@ -997,32 +997,6 @@ const extractSummaryColumns = (dataList: ProcessInstanceItem[]) => {
         }
       })
     }
-
-    // 检查formVariables中的数组类型字段（子表单）- 保持兼容性
-    if (item.formVariables) {
-      Object.entries(item.formVariables).forEach(([key, value]) => {
-        // 判断是否为数组类型且数组内容为对象（子表单）
-        if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object' && value[0] !== null) {
-          columns.add(key)
-          // 记录子表单字段
-          if (!subformColumns.has(key)) {
-            // 从第一个子表单项中提取列名
-            const subColumns = Object.keys(value[0])
-            subformColumns.set(key, subColumns)
-          }
-          // 统计字段质量
-          if (!fieldStats.has(key)) {
-            fieldStats.set(key, { count: 0, nonEmptyCount: 0, sampleValues: [] })
-          }
-          const stats = fieldStats.get(key)!
-          stats.count++
-          stats.nonEmptyCount++
-          if (stats.sampleValues.length < 3) {
-            stats.sampleValues.push(value)
-          }
-        }
-      })
-    }
   })
 
   // 保存总字段数
@@ -1043,7 +1017,7 @@ const extractSummaryColumns = (dataList: ProcessInstanceItem[]) => {
     // 获取字段统计信息
     const stats = fieldStats.get(key)
     const fillRate = stats ? (stats.nonEmptyCount / stats.count) : 0
-    
+
     // 计算智能优先级
     let smartPriority = 0
     // 基础优先级（预定义字段）
@@ -1051,10 +1025,10 @@ const extractSummaryColumns = (dataList: ProcessInstanceItem[]) => {
     if (basePriority !== -1) {
       smartPriority += (priorityFields.length - basePriority) * 100
     }
-    
+
     // 数据质量权重（非空率）
     smartPriority += Math.round(fillRate * 50)
-    
+
     // 字段名称重要性权重
     const importantKeywords = ['日期', '名称', '订货量', '销量', '编码', '属性', '承接人', '运营', '进度']
     const hasImportantKeyword = importantKeywords.some(keyword => key.includes(keyword))
@@ -1111,9 +1085,9 @@ const extractSummaryColumns = (dataList: ProcessInstanceItem[]) => {
   if (allColumns.length > maxColumns) {
     console.info(`其余 ${allColumns.length - maxColumns} 个字段可通过"查看所有字段"功能查看`)
   }
-  
+
   // 输出字段质量统计
-  console.debug('字段质量统计:', 
+  console.debug('字段质量统计:',
     Array.from(fieldStats.entries())
       .sort((a, b) => b[1].nonEmptyCount - a[1].nonEmptyCount)
       .slice(0, 10)
@@ -1129,7 +1103,7 @@ const getSubformData = (row: ProcessInstanceItem, key: string): any[] => {
     if (displayItem && Array.isArray(displayItem.value) && displayItem.value.length > 0) {
       return displayItem.value
     }
-    
+
     // 兼容字符串形式的JSON数组（旧格式）
     if (displayItem && displayItem.value && typeof displayItem.value === 'string') {
       try {
@@ -1144,15 +1118,6 @@ const getSubformData = (row: ProcessInstanceItem, key: string): any[] => {
       }
     }
   }
-
-  // 兼容原有的formVariables获取方式
-  if (row.formVariables) {
-    const value = row.formVariables[key]
-    if (Array.isArray(value) && value.length > 0) {
-      return value
-    }
-  }
-
   return []
 }
 
@@ -1171,23 +1136,23 @@ const formatArrayValue = (arrayData: any[]): string => {
   if (!arrayData || !Array.isArray(arrayData)) {
     return '[无效数据]'
   }
-  
+
   if (arrayData.length === 0) {
     return '[空数组]'
   }
-  
+
   // 过滤掉空值
   const validItems = arrayData.filter(item => item !== null && item !== undefined && item !== '')
-  
+
   if (validItems.length === 0) {
     return '[无有效数据]'
   }
-  
+
   // 如果只有一项，直接返回
   if (validItems.length === 1) {
     return String(validItems[0])
   }
-  
+
   // 多项数据处理
   if (validItems.length <= 3) {
     // 少于等于3项，全部显示
@@ -1207,25 +1172,25 @@ const formatArrayDataSummary = (arrayData: any[]): string => {
   if (!arrayData || !Array.isArray(arrayData)) {
     return '[无效数据]'
   }
-  
+
   if (arrayData.length === 0) {
     return '[空数据]'
   }
-  
+
   // 获取第一条记录
   const firstItem = arrayData[0]
-  
+
   // 如果第一条记录不是对象，直接返回值
   if (typeof firstItem !== 'object' || firstItem === null) {
     return String(firstItem)
   }
-  
+
   // 提取第一条记录的信息
   const keys = Object.keys(firstItem)
   if (keys.length === 0) {
     return '[空对象]'
   }
-  
+
   // 选择所有字段，直接展示数据内容
   const formattedData = keys.map(key => {
     const value = firstItem[key]
@@ -1238,7 +1203,7 @@ const formatArrayDataSummary = (arrayData: any[]): string => {
       return `${key}: ${String(value)}`
     }
   }).join(' | ')
-  
+
   // 如果有多条记录，添加一个简单的标记
   return arrayData.length > 1 ? `${formattedData} (+${arrayData.length - 1})` : formattedData
 }
@@ -1270,17 +1235,6 @@ const getRawValue = (row: ProcessInstanceItem, key: string): any => {
       }
     }
   }
-
-  // 最后从formVariables中获取
-  if (row.formVariables && row.formVariables[key] !== undefined && row.formVariables[key] !== null) {
-    const value = row.formVariables[key]
-    // 对于复杂类型，返回JSON字符串
-    if (typeof value === 'object') {
-      return JSON.stringify(value)
-    }
-    return value
-  }
-
   // 确保返回空字符串而不是null，这样Excel中会显示为空单元格
   return ''
 }
@@ -1437,13 +1391,13 @@ const handleViewVariables = (row) => {
 
   // 获取流程变量
   const variables = formatVariables(row.formVariables)
-  
+
   // 添加版本号信息
   if (row.processDefinitionId) {
     const versionNumber = row.processDefinitionId.split(':')[1] || '-'
     variables['流程版本号'] = versionNumber
   }
-  
+
   currentVariables.value = variables
   variablesDialogVisible.value = true
 }
@@ -1601,8 +1555,8 @@ const expandSubformDataToColumns = (
         // 根据选择的格式生成列名
         let columnName: string
         if (useSimpleHeaders) {
-          // 简洁格式：直接使用子字段名
-          columnName = subKey
+          // 简洁格式：子字段名 + 序号，避免同名字段覆盖
+          columnName = `${subKey}_${index + 1}`
         } else {
           // 带索引格式：父字段名[索引].子字段名
           columnName = `${key}[${index}].${subKey}`
@@ -1614,6 +1568,50 @@ const expandSubformDataToColumns = (
     })
   })
   return result
+}
+
+/**
+ * 将子表单数据展开为多行，便于后续进行单元格合并
+ * @param baseRow 基础行数据
+ * @param formData 表单数据
+ * @param subformColumns 子表单列配置
+ * @returns 展开后的数据行数组
+ */
+const expandSubformDataToRows = (
+  baseRow: Record<string, any>,
+  formData: ProcessInstanceItem,
+  subformColumns: ColumnItem[]
+): Record<string, any>[] => {
+  const rows: Record<string, any>[] = []
+
+  if (!subformColumns || subformColumns.length === 0) {
+    rows.push({ ...baseRow })
+    return rows
+  }
+
+  let hasSubformData = false
+
+  subformColumns.forEach(column => {
+    const key = column.key
+    const subformData = getSubformData(formData, key)
+
+    if (subformData && subformData.length > 0) {
+      hasSubformData = true
+      subformData.forEach(subItem => {
+        const row = { ...baseRow }
+        Object.entries(subItem).forEach(([subKey, subValue]) => {
+          row[`${key}.${subKey}`] = subValue
+        })
+        rows.push(row)
+      })
+    }
+  })
+
+  if (!hasSubformData) {
+    rows.push({ ...baseRow })
+  }
+
+  return rows
 }
 
 /** 显示导出选项对话框 */
@@ -1647,7 +1645,8 @@ const handleExport = async () => {
     }
 
     // 构建导出数据
-    let exportData: Record<string, any>[] = []
+    const exportData: Record<string, any>[] = []
+    const rowGroupCounts: number[] = []
 
     // 处理每一行数据
     list.value.forEach(item => {
@@ -1665,678 +1664,655 @@ const handleExport = async () => {
         '流程编号': item.id
       }
 
-      // 根据选择的子表单处理方式进行处
-
-
-        // 按列展开方式（columns-simple 或 columns-merged）
-        // 添加普通表单变量（非子表单字段）
-        visibleColumns.forEach(key => {
-          // 跳过子表单字段，它们会在expandSubformDataToColumns中处理
-          if (!subformColumns.some(col => col.key === key)) {
-            // {{ AURA-X: Modify - 修复导出时基础字段被覆盖的问题 }}
-            // 只有当baseRow中不存在该字段时，才从表单变量中获取
-            if (!(key in baseRow)) {
-              baseRow[key] = getRawValue(item, key)
-            }
+      // 添加普通表单变量（非子表单字段）
+      visibleColumns.forEach(key => {
+        if (!subformColumns.some(col => col.key === key)) {
+          if (!(key in baseRow)) {
+            baseRow[key] = getRawValue(item, key)
           }
-        })
+        }
+      })
 
-        // 使用按列展开处理函数处理子表单数据
-        // 如果是简洁表头模式，传入true
+      if (exportOptions.subformFormat === 'columns-merged') {
+        const rows = expandSubformDataToRows(baseRow, item, subformColumns)
+        exportData.push(...rows)
+        rowGroupCounts.push(rows.length)
+      } else {
         const useSimpleHeaders = exportOptions.subformFormat === 'columns-simple'
         const baseRowCopy = JSON.parse(JSON.stringify(baseRow))
-        // 使用拷贝的数据进行处理
-        const expandedRow = expandSubformDataToColumns(baseRowCopy, item, subformColumns, useSimpleHeaders)
-        // 将展开后的行添加到导出数据中
+        const expandedRow = expandSubformDataToColumns(
+          baseRowCopy,
+          item,
+          subformColumns,
+          useSimpleHeaders
+        )
         exportData.push(expandedRow)
-
-    })
-
-      try {
-        let worksheet
-        let workbook = XLSX.utils.book_new()
-
-        // 根据选择的格式创建工作表
-        if (exportOptions.subformFormat === 'columns-merged') {
-          // 带合并单元格的表格
-          worksheet = createMergedHeadersWorksheet(exportData, subformColumns)
-        } else {
-          // 普通表格 - 确保所有单元格都有数据
-          // 先处理数据，确保空值也被正确填充
-          const processedData = exportData.map(row => {
-            const processedRow = {}
-            // 获取所有可能的列名
-            const allColumns = new Set<string>()
-            exportData.forEach(dataRow => {
-              Object.keys(dataRow).forEach(key => allColumns.add(key))
-            })
-            
-            // 为每一列设置值，空值设置为空字符串
-            Array.from(allColumns).forEach(col => {
-              processedRow[col] = row[col] !== undefined && row[col] !== null ? row[col] : ''
-            })
-            
-            return processedRow
-          })
-
-          worksheet = XLSX.utils.json_to_sheet(processedData)
-
-          // 设置列宽
-          const columnWidths = [
-            { wch: 40 }, // 流程名称
-            { wch: 15 }, // 流程分类
-            { wch: 15 }, // 流程发起人
-            { wch: 15 }, // 流程状态
-            { wch: 20 }, // 发起时间
-            { wch: 20 }, // 结束时间
-            { wch: 25 }, // 当前审批任务
-            { wch: 30 }, // 运行时长
-            { wch: 30 }, // 运行时间
-            { wch: 40 }  // 流程编号
-          ]
-
-          // 为所有列设置宽度
-          const allColumns = Object.keys(processedData[0] || {})
-          allColumns.forEach((colName, index) => {
-            if (index >= columnWidths.length) {
-              // 根据列名长度和内容类型动态设置宽度
-              let width = 15 // 默认宽度
-
-              // 根据列名特征设置合适的宽度
-              if (colName.includes('[') && colName.includes(']')) {
-                // 子表单带索引的列
-                width = 25
-              } else if (['天猫预计月销量', '淘工厂预计月销量'].some(name => colName.includes(name))) {
-                // 销量相关列，可能包含较长数字
-                width = 20
-              } else if (colName.includes('商品编码')) {
-                // 商品编码列
-                width = 25
-              } else {
-                // 其他列，根据列名长度动态设置
-                width = Math.max(colName.length * 1.8, 15)
-              }
-
-              columnWidths.push({ wch: width })
-            }
-          })
-
-          worksheet['!cols'] = columnWidths
-
-          // 添加边框样式
-          applyBordersToWorksheet(worksheet)
-        }
-
-        // 添加工作表到工作簿
-        XLSX.utils.book_append_sheet(workbook, worksheet, '流程实例数据')
-
-        // 生成Excel文件
-        const excelData = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })
-        const blob = new Blob([excelData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-
-        // 下载文件
-        download.excel(blob, exportOptions.filename)
-        message.success('导出成功')
-      } catch (err) {
-        console.error('Excel生成失败', err)
-        message.error('Excel生成失败')
       }
-    } catch (error) {
-      console.error('导出失败', error)
-    } finally {
-      exportLoading.value = false
-    }
-  }
-
-  /** 窗口大小改变事件处理 **/
-  const handleResize = () => {
-    // 触发表格高度重新计算
-    // tableHeight 是computed属性，会自动响应
-  }
-
-  /** 激活时 **/
-  onActivated(() => {
-    getList()
-  })
-
-  /** 初始化 **/
-  onMounted(async () => {
-    await getList()
-    categoryList.value = await CategoryApi.getCategorySimpleList()
-    userList.value = await UserApi.getSimpleUserList()
-    
-    // 监听窗口大小变化
-    window.addEventListener('resize', handleResize)
-  })
-
-  /** 卸载时清理事件监听器 **/
-  onUnmounted(() => {
-    window.removeEventListener('resize', handleResize)
-  })
-
-  /** 查看子表单详情 */
-  const handleViewSubform = (row: ProcessInstanceItem, columnKey: string) => {
-    const data = getSubformData(row, columnKey)
-    if (data.length > 0) {
-      currentSubformTitle.value = `${row.name} - ${columnKey}`
-      currentSubformData.value = data
-
-      // 获取子表单的列
-      const column = summaryColumns.value.find(col => col.key === columnKey)
-      currentSubformColumns.value = column && column.subColumns ? column.subColumns : (data[0] && typeof data[0] === 'object' && data[0] !== null ? Object.keys(data[0]) : [])
-
-      subformDialogVisible.value = true
-    } else {
-      message.warning('没有找到子表单数据')
-    }
-  }
-
-  /** 查看所有字段 */
-  const handleViewAllFields = () => {
-    // 构建所有字段列表
-    const fields = []
-
-    // 从当前显示的字段和总字段中提取
-    const allColumns = extractAllColumns()
-    const shownKeys = summaryColumns.value.map(col => col.key)
-
-    // 保存原始显示的字段，用于重置
-    originalShownFields.value = [...shownKeys]
-
-    allColumns.forEach(column => {
-      fields.push({
-        key: column.key,
-        isSubform: column.isSubform,
-        isShown: shownKeys.includes(column.key),
-        subColumns: column.subColumns
-      })
     })
 
-    allFields.value = fields
-    selectedFields.value = [] // 清空选中的字段
-    allFieldsDialogVisible.value = true
-  }
+    try {
+      let worksheet
+      let workbook = XLSX.utils.book_new()
 
-  /** 提取所有字段列表（包括未显示的） */
-  const extractAllColumns = () => {
-    const columns = new Set<string>()
-    const subformColumns = new Map<string, string[]>() // 存储子表单结构
+      // 根据选择的格式创建工作表
+      if (exportOptions.subformFormat === 'columns-merged') {
+        // 带合并单元格的表格
+        worksheet = createMergedHeadersWorksheet(exportData, subformColumns, rowGroupCounts)
+      } else {
+        // 普通表格 - 确保所有单元格都有数据
+        // 先处理数据，确保空值也被正确填充
+        const processedData = exportData.map(row => {
+          const processedRow = {}
+          // 获取所有可能的列名
+          const allColumns = new Set<string>()
+          exportData.forEach(dataRow => {
+            Object.keys(dataRow).forEach(key => allColumns.add(key))
+          })
 
-    // 从所有数据中提取唯一的摘要键
-    list.value.forEach(item => {
-      // 从summary中提取字段
-      if (item.summary && Array.isArray(item.summary)) {
-        item.summary.forEach(summary => {
-          if (summary.key) {
-            columns.add(summary.key)
+          // 为每一列设置值，空值设置为空字符串
+          Array.from(allColumns).forEach(col => {
+            processedRow[col] = row[col] !== undefined && row[col] !== null ? row[col] : ''
+          })
+
+          return processedRow
+        })
+
+        worksheet = XLSX.utils.json_to_sheet(processedData)
+
+        // 设置列宽
+        const columnWidths = [
+          { wch: 40 }, // 流程名称
+          { wch: 15 }, // 流程分类
+          { wch: 15 }, // 流程发起人
+          { wch: 15 }, // 流程状态
+          { wch: 20 }, // 发起时间
+          { wch: 20 }, // 结束时间
+          { wch: 25 }, // 当前审批任务
+          { wch: 30 }, // 运行时长
+          { wch: 30 }, // 运行时间
+          { wch: 40 }  // 流程编号
+        ]
+
+        // 为所有列设置宽度
+        const allColumns = Object.keys(processedData[0] || {})
+        allColumns.forEach((colName, index) => {
+          if (index >= columnWidths.length) {
+            // 根据列名长度和内容类型动态设置宽度
+            let width = 15 // 默认宽度
+
+            // 根据列名特征设置合适的宽度
+            if (colName.includes('[') && colName.includes(']')) {
+              // 子表单带索引的列
+              width = 25
+            } else if (['天猫预计月销量', '淘工厂预计月销量'].some(name => colName.includes(name))) {
+              // 销量相关列，可能包含较长数字
+              width = 20
+            } else if (colName.includes('商品编码')) {
+              // 商品编码列
+              width = 25
+            } else {
+              // 其他列，根据列名长度动态设置
+              width = Math.max(colName.length * 1.8, 15)
+            }
+
+            columnWidths.push({ wch: width })
           }
         })
+
+        worksheet['!cols'] = columnWidths
+
+        // 添加边框样式
+        applyBordersToWorksheet(worksheet)
       }
 
-      // 从formVariablesDisplay中提取所有字段
-      if (item.formVariablesDisplay && Array.isArray(item.formVariablesDisplay)) {
-        item.formVariablesDisplay.forEach(display => {
-          if (display.key && !display.key.startsWith('PROCESS_') && display.key.trim() !== '') {
-            columns.add(display.key)
+      // 添加工作表到工作簿
+      XLSX.utils.book_append_sheet(workbook, worksheet, '流程实例数据')
 
-            // 检查新格式：value直接是数组类型（子表单）
-            if (Array.isArray(display.value) && display.value.length > 0 && typeof display.value[0] === 'object' && display.value[0] !== null) {
-              // 记录子表单字段
-              if (!subformColumns.has(display.key)) {
-                // 从第一个子表单项中提取列名
-                const subColumns = Object.keys(display.value[0])
-                subformColumns.set(display.key, subColumns)
-              }
+      // 生成Excel文件
+      const excelData = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })
+      const blob = new Blob([excelData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+
+      // 下载文件
+      download.excel(blob, exportOptions.filename)
+      message.success('导出成功')
+    } catch (err) {
+      console.error('Excel生成失败', err)
+      message.error('Excel生成失败')
+    }
+  } catch (error) {
+    console.error('导出失败', error)
+  } finally {
+    exportLoading.value = false
+  }
+}
+
+/** 窗口大小改变事件处理 **/
+const handleResize = () => {
+  // 触发表格高度重新计算
+  // tableHeight 是computed属性，会自动响应
+}
+
+/** 激活时 **/
+onActivated(() => {
+  getList()
+})
+
+/** 初始化 **/
+onMounted(async () => {
+  await getList()
+  categoryList.value = await CategoryApi.getCategorySimpleList()
+  userList.value = await UserApi.getSimpleUserList()
+
+  // 监听窗口大小变化
+  window.addEventListener('resize', handleResize)
+})
+
+/** 卸载时清理事件监听器 **/
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+})
+
+/** 查看子表单详情 */
+const handleViewSubform = (row: ProcessInstanceItem, columnKey: string) => {
+  const data = getSubformData(row, columnKey)
+  if (data.length > 0) {
+    currentSubformTitle.value = `${row.name} - ${columnKey}`
+    currentSubformData.value = data
+
+    // 获取子表单的列
+    const column = summaryColumns.value.find(col => col.key === columnKey)
+    currentSubformColumns.value = column && column.subColumns ? column.subColumns : (data[0] && typeof data[0] === 'object' && data[0] !== null ? Object.keys(data[0]) : [])
+
+    subformDialogVisible.value = true
+  } else {
+    message.warning('没有找到子表单数据')
+  }
+}
+
+/** 查看所有字段 */
+const handleViewAllFields = () => {
+  // 构建所有字段列表
+  const fields = []
+
+  // 从当前显示的字段和总字段中提取
+  const allColumns = extractAllColumns()
+  const shownKeys = summaryColumns.value.map(col => col.key)
+
+  // 保存原始显示的字段，用于重置
+  originalShownFields.value = [...shownKeys]
+
+  allColumns.forEach(column => {
+    fields.push({
+      key: column.key,
+      isSubform: column.isSubform,
+      isShown: shownKeys.includes(column.key),
+      subColumns: column.subColumns
+    })
+  })
+
+  allFields.value = fields
+  selectedFields.value = [] // 清空选中的字段
+  allFieldsDialogVisible.value = true
+}
+
+/** 提取所有字段列表（包括未显示的） */
+const extractAllColumns = () => {
+  const columns = new Set<string>()
+  const subformColumns = new Map<string, string[]>() // 存储子表单结构
+
+  // 从所有数据中提取唯一的摘要键
+  list.value.forEach(item => {
+    // 从summary中提取字段
+    if (item.summary && Array.isArray(item.summary)) {
+      item.summary.forEach(summary => {
+        if (summary.key) {
+          columns.add(summary.key)
+        }
+      })
+    }
+
+    // 从formVariablesDisplay中提取所有字段
+    if (item.formVariablesDisplay && Array.isArray(item.formVariablesDisplay)) {
+      item.formVariablesDisplay.forEach(display => {
+        if (display.key && !display.key.startsWith('PROCESS_') && display.key.trim() !== '') {
+          columns.add(display.key)
+
+          // 检查新格式：value直接是数组类型（子表单）
+          if (Array.isArray(display.value) && display.value.length > 0 && typeof display.value[0] === 'object' && display.value[0] !== null) {
+            // 记录子表单字段
+            if (!subformColumns.has(display.key)) {
+              // 从第一个子表单项中提取列名
+              const subColumns = Object.keys(display.value[0])
+              subformColumns.set(display.key, subColumns)
             }
-            // 检查字符串形式的JSON数组（兼容旧格式）
-            else if (display.value && typeof display.value === 'string') {
-              try {
-                if (display.value.startsWith('[{') && display.value.endsWith('}]')) {
-                  const parsedValue = JSON.parse(display.value)
-                  if (Array.isArray(parsedValue) && parsedValue.length > 0 && typeof parsedValue[0] === 'object' && parsedValue[0] !== null) {
-                    // 这是一个子表单数据
-                    if (!subformColumns.has(display.key)) {
-                      const subColumns = Object.keys(parsedValue[0])
-                      subformColumns.set(display.key, subColumns)
-                    }
+          }
+          // 检查字符串形式的JSON数组（兼容旧格式）
+          else if (display.value && typeof display.value === 'string') {
+            try {
+              if (display.value.startsWith('[{') && display.value.endsWith('}]')) {
+                const parsedValue = JSON.parse(display.value)
+                if (Array.isArray(parsedValue) && parsedValue.length > 0 && typeof parsedValue[0] === 'object' && parsedValue[0] !== null) {
+                  // 这是一个子表单数据
+                  if (!subformColumns.has(display.key)) {
+                    const subColumns = Object.keys(parsedValue[0])
+                    subformColumns.set(display.key, subColumns)
                   }
                 }
-              } catch (e) {
-                // 解析失败，不是有效的JSON
               }
+            } catch (e) {
+              // 解析失败，不是有效的JSON
             }
           }
-        })
-      }
-
-      // 检查formVariables中的数组类型字段（子表单）- 保持兼容性
-      if (item.formVariables) {
-        Object.entries(item.formVariables).forEach(([key, value]) => {
-          // 判断是否为数组类型且数组内容为对象（子表单）
-          if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object' && value[0] !== null) {
-            // 记录子表单字段
-            if (!subformColumns.has(key)) {
-              // 从第一个子表单项中提取列名
-              const subColumns = Object.keys(value[0])
-              subformColumns.set(key, subColumns)
-            }
-          }
-        })
-      }
-    })
-
-    // 转换为数组格式，包含普通字段和子表单字段
-    return Array.from(columns).map(key => {
-      // 检查是否为子表单字段
-      if (subformColumns.has(key)) {
-        return {
-          key,
-          isSubform: true,
-          subColumns: subformColumns.get(key)
         }
-      }
-      return { key, isSubform: false }
-    }) as ColumnItem[]
-  }
-
-  /** 查看子表单结构 */
-  const handleViewSubformStructure = (field) => {
-    if (field.isSubform && field.subColumns) {
-      ElMessageBox.alert(
-        field.subColumns.join(', '),
-        `子表单 "${field.key}" 的结构`,
-        { confirmButtonText: '关闭' }
-      )
+      })
     }
-  }
+  })
 
-  /** 处理字段选择变更 */
-  const handleSelectionChange = (selection) => {
-    selectedFields.value = selection
-  }
-
-  /** 显示选中的字段 */
-  const handleShowSelectedFields = () => {
-    if (selectedFields.value.length === 0) return
-
-    // 保存选中的数量
-    const selectedCount = selectedFields.value.length
-
-    // 更新字段的显示状态
-    selectedFields.value.forEach(field => {
-      const index = allFields.value.findIndex(f => f.key === field.key)
-      if (index !== -1) {
-        allFields.value[index].isShown = true
+  // 转换为数组格式，包含普通字段和子表单字段
+  return Array.from(columns).map(key => {
+    // 检查是否为子表单字段
+    if (subformColumns.has(key)) {
+      return {
+        key,
+        isSubform: true,
+        subColumns: subformColumns.get(key)
       }
-    })
+    }
+    return { key, isSubform: false }
+  }) as ColumnItem[]
+}
 
-    // 清空选中
-    selectedFields.value = []
-
-    // 提示用户
-    message.success(`已标记 ${selectedCount} 个字段为显示，点击"应用变更"生效`)
+/** 查看子表单结构 */
+const handleViewSubformStructure = (field) => {
+  if (field.isSubform && field.subColumns) {
+    ElMessageBox.alert(
+      field.subColumns.join(', '),
+      `子表单 "${field.key}" 的结构`,
+      { confirmButtonText: '关闭' }
+    )
   }
+}
 
-  /** 切换字段显示状态 */
-  const handleToggleField = (field) => {
+/** 处理字段选择变更 */
+const handleSelectionChange = (selection) => {
+  selectedFields.value = selection
+}
+
+/** 显示选中的字段 */
+const handleShowSelectedFields = () => {
+  if (selectedFields.value.length === 0) return
+
+  // 保存选中的数量
+  const selectedCount = selectedFields.value.length
+
+  // 更新字段的显示状态
+  selectedFields.value.forEach(field => {
     const index = allFields.value.findIndex(f => f.key === field.key)
     if (index !== -1) {
-      allFields.value[index].isShown = !allFields.value[index].isShown
+      allFields.value[index].isShown = true
     }
+  })
+
+  // 清空选中
+  selectedFields.value = []
+
+  // 提示用户
+  message.success(`已标记 ${selectedCount} 个字段为显示，点击"应用变更"生效`)
+}
+
+/** 切换字段显示状态 */
+const handleToggleField = (field) => {
+  const index = allFields.value.findIndex(f => f.key === field.key)
+  if (index !== -1) {
+    allFields.value[index].isShown = !allFields.value[index].isShown
   }
+}
 
-  /** 重置字段显示状态 */
-  const handleResetFields = () => {
-    // 恢复到原始状态
-    allFields.value.forEach(field => {
-      field.isShown = originalShownFields.value.includes(field.key)
+/** 重置字段显示状态 */
+const handleResetFields = () => {
+  // 恢复到原始状态
+  allFields.value.forEach(field => {
+    field.isShown = originalShownFields.value.includes(field.key)
+  })
+
+  message.success('已重置为默认显示状态')
+}
+
+/** 应用字段变更 */
+const handleApplyFieldChanges = () => {
+  // 获取所有要显示的字段
+  let fieldsToShow = allFields.value
+    .filter(field => field.isShown)
+    .map(field => {
+      return {
+        key: field.key,
+        isSubform: field.isSubform,
+        subColumns: field.subColumns
+      }
     })
 
-    message.success('已重置为默认显示状态')
-  }
+  // 检查是否有变更
+  const currentKeys = summaryColumns.value.map(col => col.key).sort().join(',')
+  const newKeys = fieldsToShow.map(field => field.key).sort().join(',')
 
-  /** 应用字段变更 */
-  const handleApplyFieldChanges = () => {
-    // 获取所有要显示的字段
-    let fieldsToShow = allFields.value
-      .filter(field => field.isShown)
-      .map(field => {
-        return {
-          key: field.key,
-          isSubform: field.isSubform,
-          subColumns: field.subColumns
-        }
-      })
-
-    // 检查是否有变更
-    const currentKeys = summaryColumns.value.map(col => col.key).sort().join(',')
-    const newKeys = fieldsToShow.map(field => field.key).sort().join(',')
-
-    if (currentKeys === newKeys) {
-      message.info('没有字段显示变更')
-      allFieldsDialogVisible.value = false
-      return
-    }
-
-    // 优先级字段列表（这些字段会排在前面）
-    const priorityFields = [
-      '反推运营发起人',
-      '反推承接人1',
-      '反推进度1',
-      '反推产品性质1',
-      '预计订货量',
-      '采购成本',
-      '输入框'
-    ]
-
-    // 按优先级排序
-    fieldsToShow.forEach(field => {
-      field.priority = priorityFields.indexOf(field.key)
-    })
-
-    fieldsToShow.sort((a, b) => {
-      if (a.priority !== -1 && b.priority !== -1) {
-        return a.priority - b.priority
-      }
-      if (a.priority !== -1) {
-        return -1
-      }
-      if (b.priority !== -1) {
-        return 1
-      }
-      return 0
-    })
-
-    // 限制最大显示字段数
-    const maxColumns = 20
-    if (fieldsToShow.length > maxColumns) {
-      fieldsToShow = fieldsToShow.slice(0, maxColumns)
-      message.warning(`显示字段数量已超过限制，已自动截取前 ${maxColumns} 个字段`)
-    }
-
-    // 更新显示的字段
-    summaryColumns.value = fieldsToShow
-    totalFieldsCount.value = allFields.value.length
-
-    message.success('已应用字段显示变更')
+  if (currentKeys === newKeys) {
+    message.info('没有字段显示变更')
     allFieldsDialogVisible.value = false
+    return
   }
 
-  /** 选择所有未显示的字段 */
-  const handleSelectHiddenFields = () => {
-    if (!fieldsTableRef.value) {
-      message.warning('表格实例未找到')
-      return
+  // 优先级字段列表（这些字段会排在前面）
+  const priorityFields = [
+    '反推运营发起人',
+    '反推承接人1',
+    '反推进度1',
+    '反推产品性质1',
+    '预计订货量',
+    '采购成本',
+    '输入框'
+  ]
+
+  // 按优先级排序
+  fieldsToShow.forEach(field => {
+    field.priority = priorityFields.indexOf(field.key)
+  })
+
+  fieldsToShow.sort((a, b) => {
+    if (a.priority !== -1 && b.priority !== -1) {
+      return a.priority - b.priority
     }
-
-    // 清除当前选中
-    fieldsTableRef.value.clearSelection()
-
-    // 选中所有未显示的字段
-    const hiddenFields = filteredAllFields.value.filter(field => !field.isShown)
-
-    // 选中未显示的字段
-    hiddenFields.forEach(field => {
-      fieldsTableRef.value!.toggleRowSelection(field, true)
-    })
-
-    if (hiddenFields.length > 0) {
-      message.success(`已选中 ${hiddenFields.length} 个未显示的字段`)
-    } else {
-      message.info('当前没有未显示的字段')
+    if (a.priority !== -1) {
+      return -1
     }
+    if (b.priority !== -1) {
+      return 1
+    }
+    return 0
+  })
+
+  // 限制最大显示字段数
+  const maxColumns = 20
+  if (fieldsToShow.length > maxColumns) {
+    fieldsToShow = fieldsToShow.slice(0, maxColumns)
+    message.warning(`显示字段数量已超过限制，已自动截取前 ${maxColumns} 个字段`)
   }
 
-  /**
-   * 创建带合并单元格的Excel工作表
-   * @param {Array} data 数据行数组
-   * @param {Array} subformColumns 子表单列配置
-   * @returns {Object} 工作表对象和合并信息
-   */
-  const createMergedHeadersWorksheet = (data: Record<string, any>[], subformColumns: ColumnItem[]) => {
-    // 如果没有数据，返回空工作表
-    if (!data || data.length === 0) {
-      return XLSX.utils.aoa_to_sheet([])
+  // 更新显示的字段
+  summaryColumns.value = fieldsToShow
+  totalFieldsCount.value = allFields.value.length
+
+  message.success('已应用字段显示变更')
+  allFieldsDialogVisible.value = false
+}
+
+/** 选择所有未显示的字段 */
+const handleSelectHiddenFields = () => {
+  if (!fieldsTableRef.value) {
+    message.warning('表格实例未找到')
+    return
+  }
+
+  // 清除当前选中
+  fieldsTableRef.value.clearSelection()
+
+  // 选中所有未显示的字段
+  const hiddenFields = filteredAllFields.value.filter(field => !field.isShown)
+
+  // 选中未显示的字段
+  hiddenFields.forEach(field => {
+    fieldsTableRef.value!.toggleRowSelection(field, true)
+  })
+
+  if (hiddenFields.length > 0) {
+    message.success(`已选中 ${hiddenFields.length} 个未显示的字段`)
+  } else {
+    message.info('当前没有未显示的字段')
+  }
+}
+
+/**
+ * 创建带合并单元格的Excel工作表（子表单按行展开）
+ * @param data 数据行数组
+ * @param subformColumns 子表单列配置
+ * @param rowGroupCounts 每组数据行数，用于垂直合并
+ */
+const createMergedHeadersWorksheet = (
+  data: Record<string, any>[],
+  subformColumns: ColumnItem[],
+  rowGroupCounts: number[]
+) => {
+  if (!data || data.length === 0) {
+    return XLSX.utils.aoa_to_sheet([])
+  }
+
+  const firstRow = data[0]
+  const baseColumns: string[] = []
+  Object.keys(firstRow).forEach(key => {
+    if (!key.includes('.')) {
+      baseColumns.push(key)
     }
+  })
 
-    // 获取第一行数据，用于提取列名
-    const firstRow = data[0]
+  const subformGroups = subformColumns.map(col => ({
+    parentKey: col.key,
+    childKeys: col.subColumns || []
+  }))
 
-    // 提取基础列（非子表单列）
-    const baseColumns: string[] = []
-    // 提取子表单列及其子列
-    const subformColumnGroups: Record<string, Set<string>> = {}
+  const headerRow1: string[] = []
+  const headerRow2: string[] = []
+  const merges: XLSXRange[] = []
 
-    Object.keys(firstRow).forEach(key => {
-      // 检查是否为子表单字段
-      const isSubformField = subformColumns.some(col => key.startsWith(col.key + '['))
+  baseColumns.forEach(col => {
+    headerRow1.push(col)
+    headerRow2.push('')
+    merges.push({ s: { r: 0, c: headerRow1.length - 1 }, e: { r: 1, c: headerRow1.length - 1 } })
+  })
 
-      if (!isSubformField) {
-        // 基础列
-        baseColumns.push(key)
-      } else {
-        // 子表单列，提取父字段名和子字段名
-        // 格式：父字段名[索引].子字段名
-        const match = key.match(/^([^[]+)\[\d+\]\.(.+)$/)
-        if (match) {
-          const [, parentKey, childKey] = match
-
-          // 初始化子表单列组
-          if (!subformColumnGroups[parentKey]) {
-            subformColumnGroups[parentKey] = new Set()
-          }
-
-          // 添加子字段名
-          subformColumnGroups[parentKey].add(childKey)
-        }
-      }
+  subformGroups.forEach(group => {
+    const startCol = headerRow1.length
+    headerRow1.push(group.parentKey)
+    for (let i = 1; i < group.childKeys.length; i++) {
+      headerRow1.push('')
+    }
+    group.childKeys.forEach(child => {
+      headerRow2.push(child)
     })
+    if (group.childKeys.length > 1) {
+      merges.push({ s: { r: 0, c: startCol }, e: { r: 0, c: startCol + group.childKeys.length - 1 } })
+    }
+  })
 
-    // 将子表单列组转换为数组格式
-    const subformGroups = Object.entries(subformColumnGroups).map(([parentKey, childKeys]) => ({
-      parentKey,
-      childKeys: Array.from(childKeys)
-    }))
-
-    // 创建表头行
-    const headerRow1: string[] = [] // 第一行表头（父字段名）
-    const headerRow2: string[] = [] // 第二行表头（子字段名）
-    const merges: XLSXRange[] = [] // 合并单元格信息
-
-    // 添加基础列到表头
-    baseColumns.forEach(col => {
-      headerRow1.push(col)
-      headerRow2.push('') // 第二行对应位置留空
-
-      // 添加合并单元格信息（垂直合并）
-      merges.push({
-        s: { r: 0, c: headerRow1.length - 1 }, // 开始单元格
-        e: { r: 1, c: headerRow1.length - 1 }  // 结束单元格
-      })
-    })
-
-    // 添加子表单列到表头
+  const dataRows = data.map(row => {
+    const dataRow: any[] = []
+    baseColumns.forEach(col => dataRow.push(row[col]))
     subformGroups.forEach(group => {
-      const { parentKey, childKeys } = group
-      const startCol = headerRow1.length
+      group.childKeys.forEach(child => {
+        const key = `${group.parentKey}.${child}`
+        dataRow.push(row[key])
+      })
+    })
+    return dataRow
+  })
 
-      // 添加父字段名到第一行
-      headerRow1.push(parentKey)
-      // 为每个子字段名添加空白占位
-      for (let i = 1; i < childKeys.length; i++) {
-        headerRow1.push('')
+  let rowOffset = 2
+  rowGroupCounts.forEach(count => {
+    if (count > 1) {
+      baseColumns.forEach((_, colIndex) => {
+        merges.push({ s: { r: rowOffset, c: colIndex }, e: { r: rowOffset + count - 1, c: colIndex } })
+      })
+    }
+    rowOffset += count
+  })
+
+  const worksheet = XLSX.utils.aoa_to_sheet([headerRow1, headerRow2, ...dataRows])
+  worksheet['!merges'] = merges
+
+  const columnWidths = []
+  const totalColumns = headerRow2.length
+  for (let i = 0; i < totalColumns; i++) {
+    let width = 15
+    const header1 = headerRow1[i] || ''
+    const header2 = headerRow2[i] || ''
+    if (i < baseColumns.length) {
+      if (header1 === '流程名称' || header1 === '流程编号') {
+        width = 40
+      } else if (header1 === '发起时间' || header1 === '结束时间') {
+        width = 20
+      } else if (header1 === '当前审批任务') {
+        width = 25
+      } else if (header1 === '流程分类' || header1 === '流程发起人' || header1 === '流程状态') {
+        width = 15
+      }
+    } else {
+      if (header2.includes('天猫预计月销量') || header2.includes('淘工厂预计月销量')) {
+        width = 20
+      } else if (header2.includes('商品编码')) {
+        width = 25
+      } else {
+        const headerLength = Math.max(header1.length, header2.length)
+        width = Math.max(headerLength * 1.8, 15)
+      }
+    }
+    columnWidths.push({ wch: width })
+  }
+
+  worksheet['!cols'] = columnWidths
+  applyBordersToWorksheet(worksheet, 2)
+  return worksheet
+}
+
+/**
+ * 为工作表添加边框样式
+ * @param {Object} worksheet 工作表对象
+ * @param {Number} headerRows 表头行数（默认为1）
+ * @returns {Object} 添加了边框样式的工作表对象
+ */
+const applyBordersToWorksheet = (worksheet: any, headerRows = 1) => {
+  // 如果工作表为空，直接返回
+  if (!worksheet || !worksheet['!ref']) {
+    return worksheet
+  }
+
+  // 获取工作表范围
+  const range = XLSX.utils.decode_range(worksheet['!ref'])
+
+  // 定义边框样式
+  const borderStyle = {
+    style: 'thin', // 细线
+    color: { rgb: '666666' } // 深灰色，比纯黑色更柔和
+  }
+
+  // 定义表头边框样式（稍粗一些）
+  const headerBorderStyle = {
+    style: 'medium', // 中等粗细
+    color: { rgb: '333333' } // 深灰色
+  }
+
+  // 定义完整边框
+  const fullBorder = {
+    top: borderStyle,
+    bottom: borderStyle,
+    left: borderStyle,
+    right: borderStyle
+  }
+
+  // 定义表头边框
+  const headerBorder = {
+    top: headerBorderStyle,
+    bottom: headerBorderStyle,
+    left: headerBorderStyle,
+    right: headerBorderStyle
+  }
+
+  // 首先为所有单元格添加完整边框和基础样式
+  for (let r = range.s.r; r <= range.e.r; r++) {
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const cellAddress = XLSX.utils.encode_cell({ r, c })
+
+      // 如果单元格不存在，创建一个空单元格
+      if (!worksheet[cellAddress]) {
+        worksheet[cellAddress] = { v: '', t: 's' }
       }
 
-      // 添加子字段名到第二行
-      childKeys.forEach(childKey => {
-        headerRow2.push(childKey)
-      })
-
-      // 添加合并单元格信息（水平合并）
-      if (childKeys.length > 1) {
-        merges.push({
-          s: { r: 0, c: startCol }, // 开始单元格
-          e: { r: 0, c: startCol + childKeys.length - 1 } // 结束单元格
-        })
+      // 如果单元格没有样式，添加样式对象
+      if (!worksheet[cellAddress].s) {
+        worksheet[cellAddress].s = {}
       }
-    })
 
-    // 创建数据行
-    const dataRows = data.map(row => {
-      const dataRow: any[] = []
-
-      // 添加基础列数据
-      baseColumns.forEach(col => {
-        dataRow.push(row[col])
-      })
-
-      // 添加子表单列数据
-      subformGroups.forEach(group => {
-        const { parentKey, childKeys } = group
-
-        // 遍历子字段名
-        childKeys.forEach(childKey => {
-          // 查找对应的数据
-          // 由于原始数据格式为 parentKey[index].childKey，需要查找匹配的键
-          let value = null
-          Object.entries(row).forEach(([key, val]) => {
-            if (key.startsWith(`${parentKey}[`) && key.endsWith(`.${childKey}`)) {
-              value = val
-            }
-          })
-
-          dataRow.push(value)
-        })
-      })
-
-      return dataRow
-    })
-
-    // 合并表头和数据行
-    const allRows = [headerRow1, headerRow2, ...dataRows]
-
-    // 创建工作表
-    const worksheet = XLSX.utils.aoa_to_sheet(allRows)
-
-    // 添加合并单元格信息
-    worksheet['!merges'] = merges
-
-    // 设置列宽
-    const columnWidths = []
-
-    // 计算总列数
-    const totalColumns = headerRow2.length
-
-    // 设置每列的宽度
-    for (let i = 0; i < totalColumns; i++) {
-      let width = 15 // 默认宽度
-
-              // 获取当前列的表头
-        const header1 = headerRow1[i] || ''
-        const header2 = headerRow2[i] || ''
-
-          // 根据表头内容设置合适的宽度
-        if (i < baseColumns.length) {
-          // 基础列
-          if (header1 === '流程名称' || header1 === '流程编号') {
-            width = 40
-          } else if (header1 === '发起时间' || header1 === '结束时间') {
-            width = 20
-          } else if (header1 === '当前审批任务') {
-            width = 25
-          } else if (header1 === '流程分类' || header1 === '流程发起人' || header1 === '流程状态') {
-            width = 15
-          }
-        } else {
-          // 子表单列
-          if (header2.includes('天猫预计月销量') || header2.includes('淘工厂预计月销量')) {
-            width = 20
-          } else if (header2.includes('商品编码')) {
-            width = 25
-          } else {
-            // 根据表头长度动态设置
-            const headerLength = Math.max(header1.length, header2.length)
-            width = Math.max(headerLength * 1.8, 15)
+      // 为表头和数据行设置不同的边框和样式
+      if (r < headerRows) {
+        // 表头使用更粗的边框
+        worksheet[cellAddress].s.border = { ...headerBorder }
+        worksheet[cellAddress].s.fill = {
+          type: 'pattern',
+          patternType: 'solid',
+          fgColor: { rgb: 'F0F0F0' } // 更浅的灰色背景
+        }
+        worksheet[cellAddress].s.font = {
+          bold: true,
+          size: 11,
+          color: { rgb: '333333' }
+        }
+        worksheet[cellAddress].s.alignment = {
+          horizontal: 'center',
+          vertical: 'center',
+          wrapText: false
+        }
+      } else {
+        // 数据行使用普通边框
+        worksheet[cellAddress].s.border = { ...fullBorder }
+        worksheet[cellAddress].s.font = {
+          size: 10,
+          color: { rgb: '333333' }
+        }
+        worksheet[cellAddress].s.alignment = {
+          horizontal: 'left',
+          vertical: 'center',
+          wrapText: true
+        }
+        // 为数据行添加交替背景色
+        if (r % 2 === 0) {
+          worksheet[cellAddress].s.fill = {
+            type: 'pattern',
+            patternType: 'solid',
+            fgColor: { rgb: 'FAFAFA' } // 很浅的灰色
           }
         }
-
-        columnWidths.push({ wch: width })
       }
-
-      worksheet['!cols'] = columnWidths
-
-      // 添加边框样式 - 使用2作为headerRows参数，因为我们有两行表头
-      applyBordersToWorksheet(worksheet, 2)
-
-      return worksheet
     }
+  }
 
-    /**
-     * 为工作表添加边框样式
-     * @param {Object} worksheet 工作表对象
-     * @param {Number} headerRows 表头行数（默认为1）
-     * @returns {Object} 添加了边框样式的工作表对象
-     */
-    const applyBordersToWorksheet = (worksheet: any, headerRows = 1) => {
-      // 如果工作表为空，直接返回
-      if (!worksheet || !worksheet['!ref']) {
-        return worksheet
-      }
+  // 特别处理合并单元格，确保合并区域内的所有单元格都有正确的样式
+  if (worksheet['!merges']) {
+    worksheet['!merges'].forEach((merge: XLSXRange) => {
+      const top = merge.s.r
+      const bottom = merge.e.r
+      const left = merge.s.c
+      const right = merge.e.c
 
-      // 获取工作表范围
-      const range = XLSX.utils.decode_range(worksheet['!ref'])
-
-      // 定义边框样式
-      const borderStyle = {
-        style: 'thin', // 细线
-        color: { rgb: '666666' } // 深灰色，比纯黑色更柔和
-      }
-
-      // 定义表头边框样式（稍粗一些）
-      const headerBorderStyle = {
-        style: 'medium', // 中等粗细
-        color: { rgb: '333333' } // 深灰色
-      }
-
-      // 定义完整边框
-      const fullBorder = {
-        top: borderStyle,
-        bottom: borderStyle,
-        left: borderStyle,
-        right: borderStyle
-      }
-
-      // 定义表头边框
-      const headerBorder = {
-        top: headerBorderStyle,
-        bottom: headerBorderStyle,
-        left: headerBorderStyle,
-        right: headerBorderStyle
-      }
-
-      // 首先为所有单元格添加完整边框和基础样式
-      for (let r = range.s.r; r <= range.e.r; r++) {
-        for (let c = range.s.c; c <= range.e.c; c++) {
+      // 为合并区域的每个单元格重新设置样式
+      for (let r = top; r <= bottom; r++) {
+        for (let c = left; c <= right; c++) {
           const cellAddress = XLSX.utils.encode_cell({ r, c })
 
-          // 如果单元格不存在，创建一个空单元格
+          // 确保单元格存在
           if (!worksheet[cellAddress]) {
             worksheet[cellAddress] = { v: '', t: 's' }
           }
 
-          // 如果单元格没有样式，添加样式对象
+          // 确保单元格有样式对象
           if (!worksheet[cellAddress].s) {
             worksheet[cellAddress].s = {}
           }
 
-          // 为表头和数据行设置不同的边框和样式
+          // 为合并单元格设置边框和样式
           if (r < headerRows) {
-            // 表头使用更粗的边框
+            // 合并表头单元格使用表头边框
             worksheet[cellAddress].s.border = { ...headerBorder }
             worksheet[cellAddress].s.fill = {
               type: 'pattern',
               patternType: 'solid',
-              fgColor: { rgb: 'F0F0F0' } // 更浅的灰色背景
+              fgColor: { rgb: 'E8E8E8' } // 合并表头使用稍深的灰色
             }
             worksheet[cellAddress].s.font = {
               bold: true,
@@ -2349,329 +2325,247 @@ const handleExport = async () => {
               wrapText: false
             }
           } else {
-            // 数据行使用普通边框
+            // 合并数据单元格使用普通边框
             worksheet[cellAddress].s.border = { ...fullBorder }
             worksheet[cellAddress].s.font = {
               size: 10,
               color: { rgb: '333333' }
             }
             worksheet[cellAddress].s.alignment = {
-              horizontal: 'left',
+              horizontal: 'center',
               vertical: 'center',
               wrapText: true
             }
-            // 为数据行添加交替背景色
-            if (r % 2 === 0) {
-              worksheet[cellAddress].s.fill = {
-                type: 'pattern',
-                patternType: 'solid',
-                fgColor: { rgb: 'FAFAFA' } // 很浅的灰色
-              }
-            }
           }
         }
       }
+    })
+  }
 
-      // 特别处理合并单元格，确保合并区域内的所有单元格都有正确的样式
-      if (worksheet['!merges']) {
-        worksheet['!merges'].forEach((merge: XLSXRange) => {
-          const top = merge.s.r
-          const bottom = merge.e.r
-          const left = merge.s.c
-          const right = merge.e.c
+  // 最后确保所有单元格都存在并有内容
+  for (let r = range.s.r; r <= range.e.r; r++) {
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const cellAddress = XLSX.utils.encode_cell({ r, c })
 
-          // 为合并区域的每个单元格重新设置样式
-          for (let r = top; r <= bottom; r++) {
-            for (let c = left; c <= right; c++) {
-              const cellAddress = XLSX.utils.encode_cell({ r, c })
+      // 如果单元格仍然没有值，设置为空字符串
+      if (!worksheet[cellAddress] || worksheet[cellAddress].v === undefined || worksheet[cellAddress].v === null) {
+        if (!worksheet[cellAddress]) {
+          worksheet[cellAddress] = { v: '', t: 's' }
+        } else {
+          worksheet[cellAddress].v = ''
+          worksheet[cellAddress].t = 's'
+        }
 
-              // 确保单元格存在
-              if (!worksheet[cellAddress]) {
-                worksheet[cellAddress] = { v: '', t: 's' }
-              }
+        // 确保空单元格也有样式
+        if (!worksheet[cellAddress].s) {
+          worksheet[cellAddress].s = {}
+        }
 
-              // 确保单元格有样式对象
-              if (!worksheet[cellAddress].s) {
-                worksheet[cellAddress].s = {}
-              }
-
-              // 为合并单元格设置边框和样式
-              if (r < headerRows) {
-                // 合并表头单元格使用表头边框
-                worksheet[cellAddress].s.border = { ...headerBorder }
-                worksheet[cellAddress].s.fill = {
-                  type: 'pattern',
-                  patternType: 'solid',
-                  fgColor: { rgb: 'E8E8E8' } // 合并表头使用稍深的灰色
-                }
-                worksheet[cellAddress].s.font = {
-                  bold: true,
-                  size: 11,
-                  color: { rgb: '333333' }
-                }
-                worksheet[cellAddress].s.alignment = {
-                  horizontal: 'center',
-                  vertical: 'center',
-                  wrapText: false
-                }
-              } else {
-                // 合并数据单元格使用普通边框
-                worksheet[cellAddress].s.border = { ...fullBorder }
-                worksheet[cellAddress].s.font = {
-                  size: 10,
-                  color: { rgb: '333333' }
-                }
-                worksheet[cellAddress].s.alignment = {
-                  horizontal: 'center',
-                  vertical: 'center',
-                  wrapText: true
-                }
-              }
-            }
+        // 为空单元格设置边框和基础样式
+        if (r < headerRows) {
+          worksheet[cellAddress].s.border = { ...headerBorder }
+          worksheet[cellAddress].s.fill = {
+            type: 'pattern',
+            patternType: 'solid',
+            fgColor: { rgb: 'F0F0F0' }
           }
-        })
-      }
-
-      // 最后确保所有单元格都存在并有内容
-      for (let r = range.s.r; r <= range.e.r; r++) {
-        for (let c = range.s.c; c <= range.e.c; c++) {
-          const cellAddress = XLSX.utils.encode_cell({ r, c })
-          
-          // 如果单元格仍然没有值，设置为空字符串
-          if (!worksheet[cellAddress] || worksheet[cellAddress].v === undefined || worksheet[cellAddress].v === null) {
-            if (!worksheet[cellAddress]) {
-              worksheet[cellAddress] = { v: '', t: 's' }
-            } else {
-              worksheet[cellAddress].v = ''
-              worksheet[cellAddress].t = 's'
-            }
-            
-            // 确保空单元格也有样式
-            if (!worksheet[cellAddress].s) {
-              worksheet[cellAddress].s = {}
-            }
-            
-            // 为空单元格设置边框和基础样式
-            if (r < headerRows) {
-              worksheet[cellAddress].s.border = { ...headerBorder }
-              worksheet[cellAddress].s.fill = {
-                type: 'pattern',
-                patternType: 'solid',
-                fgColor: { rgb: 'F0F0F0' }
-              }
-              worksheet[cellAddress].s.font = {
-                bold: true,
-                size: 11,
-                color: { rgb: '333333' }
-              }
-              worksheet[cellAddress].s.alignment = {
-                horizontal: 'center',
-                vertical: 'center',
-                wrapText: false
-              }
-            } else {
-              worksheet[cellAddress].s.border = { ...fullBorder }
-              worksheet[cellAddress].s.font = {
-                size: 10,
-                color: { rgb: '999999' } // 空值用浅色显示
-              }
-              worksheet[cellAddress].s.alignment = {
-                horizontal: 'center',
-                vertical: 'center',
-                wrapText: false
-              }
-              // 空值单元格使用更浅的背景色
-              worksheet[cellAddress].s.fill = {
-                type: 'pattern',
-                patternType: 'solid',
-                fgColor: { rgb: 'F8F8F8' }
-              }
-            }
+          worksheet[cellAddress].s.font = {
+            bold: true,
+            size: 11,
+            color: { rgb: '333333' }
+          }
+          worksheet[cellAddress].s.alignment = {
+            horizontal: 'center',
+            vertical: 'center',
+            wrapText: false
+          }
+        } else {
+          worksheet[cellAddress].s.border = { ...fullBorder }
+          worksheet[cellAddress].s.font = {
+            size: 10,
+            color: { rgb: '999999' } // 空值用浅色显示
+          }
+          worksheet[cellAddress].s.alignment = {
+            horizontal: 'center',
+            vertical: 'center',
+            wrapText: false
+          }
+          // 空值单元格使用更浅的背景色
+          worksheet[cellAddress].s.fill = {
+            type: 'pattern',
+            patternType: 'solid',
+            fgColor: { rgb: 'F8F8F8' }
           }
         }
       }
-
-      return worksheet
     }
-
-  /** 格式化任务创建时间 */
-  const formatTaskCreateTime = (timestamp: number) => {
-    if (!timestamp) return '-'
-    return dateFormatter(null, null, new Date(timestamp))
   }
 
-  /** 计算任务运行时长 */
-  const calculateTaskRunningTime = (timestamp: number) => {
-    if (!timestamp) return '-'
-    const duration = Date.now() - timestamp
-    return formatPast2(duration)
-  }
+  return worksheet
+}
 
-  /** 格式化任务运行时长用于导出 */
-  const formatTasksRunningTimeForExport = (tasks: ProcessTask[]): string => {
-    if (!tasks || tasks.length === 0) {
-      return '-'
-    }
-    return tasks.map(task => `${task.name}: ${calculateTaskRunningTime(task.createTime)}`).join(', ')
-  }
+/** 格式化任务创建时间 */
+const formatTaskCreateTime = (timestamp: number) => {
+  if (!timestamp) return '-'
+  return dateFormatter(null, null, new Date(timestamp))
+}
 
-  /** 格式化任务运行时间用于导出 */
-  const formatTasksCreateTimeForExport = (tasks: ProcessTask[]): string => {
-    if (!tasks || tasks.length === 0) {
-      return '-'
-    }
-    return tasks.map(task => `${task.name}: ${formatTaskCreateTime(task.createTime)}`).join(', ')
-  }
+/** 计算任务运行时长 */
+const calculateTaskRunningTime = (timestamp: number) => {
+  if (!timestamp) return '-'
+  const duration = Date.now() - timestamp
+  return formatPast2(duration)
+}
 
-  /** 获取列宽度 */
-  const getColumnWidth = (column: ColumnItem): number => {
-    // 基础宽度
-    let width = 120
-    
-    // 根据字段名长度调整
-    const labelLength = column.key.length
-    width += Math.min(labelLength * 8, 100)
-    
-    // 根据字段类型调整
-    if (column.isSubform) {
-      width = Math.max(width, 200) // 子表单字段需要更多空间
-    } else {
-      // 根据字段重要性调整
-      if (column.smartPriority && column.smartPriority > 200) {
-        width += 50 // 重要字段给更多空间
-      }
-      
-      // 根据数据填充率调整
-      if (column.fillRate && column.fillRate > 0.8) {
-        width += 30 // 数据充足的字段给更多空间
-      }
-    }
-    
-    // 特定字段的宽度优化
-    const wideFields = ['推品名称', '产品线简称', '供应商名称', '特殊备注', '产品信息']
-    if (wideFields.some(field => column.key.includes(field))) {
-      width = Math.max(width, 250)
-    }
-    
-    // 数组类型字段需要更多空间（如类目选择）
-    const arrayFields = ['类目选择', '选择', '列表', '多选']
-    if (arrayFields.some(field => column.key.includes(field))) {
-      width = Math.max(width, 300)
-    }
-    
-    const narrowFields = ['日期', '状态', '属性', '数量']
-    if (narrowFields.some(field => column.key.includes(field))) {
-      width = Math.min(width, 150)
-    }
-    
-    // 确保宽度在合理范围内
-    return Math.max(120, Math.min(width, 400))
+/** 格式化任务运行时长用于导出 */
+const formatTasksRunningTimeForExport = (tasks: ProcessTask[]): string => {
+  if (!tasks || tasks.length === 0) {
+    return '-'
   }
+  return tasks.map(task => `${task.name}: ${calculateTaskRunningTime(task.createTime)}`).join(', ')
+}
 
-  /** 获取列样式类名 */
-  const getColumnClass = (column: ColumnItem): string => {
-    const classes = ['custom-column']
-    
-    if (column.isSubform) {
-      classes.push('subform-column')
-    }
-    
+/** 格式化任务运行时间用于导出 */
+const formatTasksCreateTimeForExport = (tasks: ProcessTask[]): string => {
+  if (!tasks || tasks.length === 0) {
+    return '-'
+  }
+  return tasks.map(task => `${task.name}: ${formatTaskCreateTime(task.createTime)}`).join(', ')
+}
+
+/** 获取列宽度 */
+const getColumnWidth = (column: ColumnItem): number => {
+  // 基础宽度
+  let width = 120
+
+  // 根据字段名长度调整
+  const labelLength = column.key.length
+  width += Math.min(labelLength * 8, 100)
+
+  // 根据字段类型调整
+  if (column.isSubform) {
+    width = Math.max(width, 200) // 子表单字段需要更多空间
+  } else {
+    // 根据字段重要性调整
     if (column.smartPriority && column.smartPriority > 200) {
-      classes.push('high-priority-column')
+      width += 50 // 重要字段给更多空间
     }
-    
+
+    // 根据数据填充率调整
     if (column.fillRate && column.fillRate > 0.8) {
-      classes.push('high-fill-column')
-    } else if (column.fillRate && column.fillRate < 0.3) {
-      classes.push('low-fill-column')
+      width += 30 // 数据充足的字段给更多空间
     }
-    
-    return classes.join(' ')
   }
 
-  /** 获取列提示信息 */
-  const getColumnTooltip = (column: ColumnItem): string => {
-    const tooltips = []
-    
-    if (column.fillRate !== undefined) {
-      tooltips.push(`数据填充率: ${(column.fillRate * 100).toFixed(1)}%`)
-    }
-    
-    if (column.smartPriority !== undefined) {
-      tooltips.push(`智能优先级: ${column.smartPriority}`)
-    }
-    
-    if (column.isSubform) {
-      tooltips.push('子表单字段，点击查看详情')
-    }
-    
-    return tooltips.length > 0 ? tooltips.join('\n') : ''
+  // 特定字段的宽度优化
+  const wideFields = ['推品名称', '产品线简称', '供应商名称', '特殊备注', '产品信息']
+  if (wideFields.some(field => column.key.includes(field))) {
+    width = Math.max(width, 250)
   }
 
-  /** 判断是否为长内容 */
-  const isLongContent = (content: string): boolean => {
-    if (!content || content === '-') return false
-    return content.length > 50 || content.includes('\n')
+  // 数组类型字段需要更多空间（如类目选择）
+  const arrayFields = ['类目选择', '选择', '列表', '多选']
+  if (arrayFields.some(field => column.key.includes(field))) {
+    width = Math.max(width, 300)
   }
 
-  /** 判断是否为数组字段 */
-  const isArrayField = (row: ProcessInstanceItem, key: string): boolean => {
-    // 首先从formVariablesDisplay中检查
-    if (row.formVariablesDisplay && Array.isArray(row.formVariablesDisplay)) {
-      const displayItem = row.formVariablesDisplay.find(item => item.key === key)
-      if (displayItem && Array.isArray(displayItem.value)) {
-        // 如果是字符串或数字数组，返回true
-        return displayItem.value.length > 0 && (typeof displayItem.value[0] === 'string' || typeof displayItem.value[0] === 'number')
-      }
-    }
-
-    // 检查formVariables
-    if (row.formVariables && row.formVariables[key] !== undefined) {
-      const value = row.formVariables[key]
-      if (Array.isArray(value)) {
-        return value.length > 0 && (typeof value[0] === 'string' || typeof value[0] === 'number')
-      }
-    }
-
-    // 检查summary
-    if (row.summary && Array.isArray(row.summary)) {
-      const summaryItem = row.summary.find(item => item.key === key)
-      if (summaryItem && Array.isArray(summaryItem.value)) {
-        return summaryItem.value.length > 0 && (typeof summaryItem.value[0] === 'string' || typeof summaryItem.value[0] === 'number')
-      }
-    }
-
-    return false
+  const narrowFields = ['日期', '状态', '属性', '数量']
+  if (narrowFields.some(field => column.key.includes(field))) {
+    width = Math.min(width, 150)
   }
 
-  /** 获取数组字段的完整数据 */
-  const getArrayFieldData = (row: ProcessInstanceItem, key: string): any[] => {
-    // 首先从formVariablesDisplay中获取
-    if (row.formVariablesDisplay && Array.isArray(row.formVariablesDisplay)) {
-      const displayItem = row.formVariablesDisplay.find(item => item.key === key)
-      if (displayItem && Array.isArray(displayItem.value)) {
-        return displayItem.value.filter(item => item !== null && item !== undefined && item !== '')
-      }
-    }
+  // 确保宽度在合理范围内
+  return Math.max(120, Math.min(width, 400))
+}
 
-    // 检查formVariables
-    if (row.formVariables && row.formVariables[key] !== undefined) {
-      const value = row.formVariables[key]
-      if (Array.isArray(value)) {
-        return value.filter(item => item !== null && item !== undefined && item !== '')
-      }
-    }
+/** 获取列样式类名 */
+const getColumnClass = (column: ColumnItem): string => {
+  const classes = ['custom-column']
 
-    // 检查summary
-    if (row.summary && Array.isArray(row.summary)) {
-      const summaryItem = row.summary.find(item => item.key === key)
-      if (summaryItem && Array.isArray(summaryItem.value)) {
-        return summaryItem.value.filter(item => item !== null && item !== undefined && item !== '')
-      }
-    }
-
-    return []
+  if (column.isSubform) {
+    classes.push('subform-column')
   }
+
+  if (column.smartPriority && column.smartPriority > 200) {
+    classes.push('high-priority-column')
+  }
+
+  if (column.fillRate && column.fillRate > 0.8) {
+    classes.push('high-fill-column')
+  } else if (column.fillRate && column.fillRate < 0.3) {
+    classes.push('low-fill-column')
+  }
+
+  return classes.join(' ')
+}
+
+/** 获取列提示信息 */
+const getColumnTooltip = (column: ColumnItem): string => {
+  const tooltips = []
+
+  if (column.fillRate !== undefined) {
+    tooltips.push(`数据填充率: ${(column.fillRate * 100).toFixed(1)}%`)
+  }
+
+  if (column.smartPriority !== undefined) {
+    tooltips.push(`智能优先级: ${column.smartPriority}`)
+  }
+
+  if (column.isSubform) {
+    tooltips.push('子表单字段，点击查看详情')
+  }
+
+  return tooltips.length > 0 ? tooltips.join('\n') : ''
+}
+
+/** 判断是否为长内容 */
+const isLongContent = (content: string): boolean => {
+  if (!content || content === '-') return false
+  return content.length > 50 || content.includes('\n')
+}
+
+/** 判断是否为数组字段 */
+const isArrayField = (row: ProcessInstanceItem, key: string): boolean => {
+  // 首先从formVariablesDisplay中检查
+  if (row.formVariablesDisplay && Array.isArray(row.formVariablesDisplay)) {
+    const displayItem = row.formVariablesDisplay.find(item => item.key === key)
+    if (displayItem && Array.isArray(displayItem.value)) {
+      // 如果是字符串或数字数组，返回true
+      return displayItem.value.length > 0 && (typeof displayItem.value[0] === 'string' || typeof displayItem.value[0] === 'number')
+    }
+  }
+
+  // 检查summary
+  if (row.summary && Array.isArray(row.summary)) {
+    const summaryItem = row.summary.find(item => item.key === key)
+    if (summaryItem && Array.isArray(summaryItem.value)) {
+      return summaryItem.value.length > 0 && (typeof summaryItem.value[0] === 'string' || typeof summaryItem.value[0] === 'number')
+    }
+  }
+
+  return false
+}
+
+/** 获取数组字段的完整数据 */
+const getArrayFieldData = (row: ProcessInstanceItem, key: string): any[] => {
+  // 首先从formVariablesDisplay中获取
+  if (row.formVariablesDisplay && Array.isArray(row.formVariablesDisplay)) {
+    const displayItem = row.formVariablesDisplay.find(item => item.key === key)
+    if (displayItem && Array.isArray(displayItem.value)) {
+      return displayItem.value.filter(item => item !== null && item !== undefined && item !== '')
+    }
+  }
+
+  // 检查summary
+  if (row.summary && Array.isArray(row.summary)) {
+    const summaryItem = row.summary.find(item => item.key === key)
+    if (summaryItem && Array.isArray(summaryItem.value)) {
+      return summaryItem.value.filter(item => item !== null && item !== undefined && item !== '')
+    }
+  }
+
+  return []
+}
 
 
 </script>
@@ -2784,7 +2678,7 @@ const handleExport = async () => {
       font-weight: 600;
     }
   }
-  
+
   .el-table__body-wrapper {
     .el-table__row {
       &:hover {
@@ -2792,51 +2686,51 @@ const handleExport = async () => {
       }
     }
   }
-  
+
   /* 固定列阴影效果 */
   .el-table__fixed-left::before {
     box-shadow: 2px 0 6px rgba(0, 0, 0, 0.1);
   }
-  
+
   .el-table__fixed-right::before {
     box-shadow: -2px 0 6px rgba(0, 0, 0, 0.1);
   }
-  
+
   /* 增强滚动条显示 */
   .el-scrollbar__bar {
     opacity: 1 !important;
     z-index: 100;
   }
-  
+
   .el-scrollbar__bar.is-vertical {
     right: 0;
     width: 8px;
   }
-  
+
   .el-scrollbar__bar.is-horizontal {
     bottom: 0;
     height: 8px;
   }
-  
+
   .el-scrollbar__thumb {
     background-color: #409eff !important;
     border-radius: 4px;
     opacity: 0.7;
     transition: all 0.3s ease;
   }
-  
+
   .el-scrollbar__thumb:hover {
     background-color: #337ecc !important;
     opacity: 1;
   }
-  
+
   /* 滚动轨道 */
   .el-scrollbar__track {
     background-color: #f5f5f5;
     border-radius: 4px;
     opacity: 0.8;
   }
-  
+
   .el-scrollbar__track:hover {
     background-color: #e8e8e8;
   }
@@ -2876,7 +2770,7 @@ const handleExport = async () => {
   /* 确保表格可以水平滚动 */
   overflow-x: auto;
   overflow-y: auto;
-  
+
   /* 添加滚动指示器 */
   box-shadow: inset 0 -1px 3px rgba(0, 0, 0, 0.1);
 }
@@ -2885,9 +2779,9 @@ const handleExport = async () => {
   /* 确保表格主体可以滚动 */
   overflow-x: auto;
   overflow-y: auto;
-  
+
   /* 添加滚动阴影提示 */
-  background: 
+  background:
     linear-gradient(90deg, white 30%, rgba(255,255,255,0)),
     linear-gradient(90deg, rgba(255,255,255,0), white 70%),
     radial-gradient(farthest-side at 0 50%, rgba(0,0,0,.2), rgba(0,0,0,0)),
@@ -2935,12 +2829,10 @@ const handleExport = async () => {
       font-size: 12px;
     }
   }
-  
+
   /* 小屏幕下调整表格高度 */
   .table-container {
     height: 400px;
   }
 }
 </style>
-
-

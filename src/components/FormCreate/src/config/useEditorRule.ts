@@ -25,6 +25,11 @@ export const useEditorRule = () => {
           field: 'height',
           title: '高度'
         },
+        {
+          type: 'input',
+          field: 'width',
+          title: '宽度'
+        },
         { type: 'switch', field: 'readonly', title: '是否只读' }
       ])
     }

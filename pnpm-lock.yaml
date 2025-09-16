@@ -12,7 +12,7 @@ importers:
         specifier: ^2.3.1
         version: 2.3.1(vue@3.5.12(typescript@5.3.3))
       '@form-create/designer':
-        specifier: file:E:/Biancheng/Web/form-create-designer/packages/element-ui/form-create-designer-3.2.11.tgz
+        specifier: file:E://Biancheng//Web//form-create-designer//packages//element-ui//form-create-designer-3.2.11.tgz
         version: file:../form-create-designer/packages/element-ui/form-create-designer-3.2.11.tgz(vue@3.5.12(typescript@5.3.3))
       '@form-create/element-ui':
         specifier: ^3.2.19
@@ -125,9 +125,6 @@ importers:
       nprogress:
         specifier: ^0.2.0
         version: 0.2.0
-      pako:
-        specifier: ^2.1.0
-        version: 2.1.0
       pinia:
         specifier: ^2.3.0
         version: 2.3.0(typescript@5.3.3)(vue@3.5.12(typescript@5.3.3))
@@ -201,6 +198,9 @@ importers:
       '@purge-icons/generated':
         specifier: ^0.9.0
         version: 0.9.0
+      '@types/crypto-js':
+        specifier: ^4.2.2
+        version: 4.2.2
       '@types/lodash-es':
         specifier: ^4.17.12
         version: 4.17.12
@@ -210,9 +210,6 @@ importers:
       '@types/nprogress':
         specifier: ^0.2.3
         version: 0.2.3
-      '@types/pako':
-        specifier: ^2.0.3
-        version: 2.0.3
       '@types/qrcode':
         specifier: ^1.5.5
         version: 1.5.5
@@ -1242,7 +1239,7 @@ packages:
       vue: ^3.1.0
 
   '@form-create/designer@file:../form-create-designer/packages/element-ui/form-create-designer-3.2.11.tgz':
-    resolution: {integrity: sha512-JUNGGnli8gRlMS4LBPXJxTM4tTFiIKbg4MJd16mXi0ljptRAr/nPtwAivXDRCuAGHZZV35nd72uOauH+D1NDcg==, tarball: file:../form-create-designer/packages/element-ui/form-create-designer-3.2.11.tgz}
+    resolution: {integrity: sha512-yFVOLPbtvcbub69FEW4F4G3GcYGJNemq467XNgpR6E026Wm27mnB3USDHAfgHekiPSlByXuX1VJFPJW6H4WYJQ==, tarball: file:../form-create-designer/packages/element-ui/form-create-designer-3.2.11.tgz}
     version: 3.2.11
     peerDependencies:
       vue: ^3.1.5
@@ -1737,6 +1734,9 @@ packages:
   '@types/conventional-commits-parser@5.0.1':
     resolution: {integrity: sha512-7uz5EHdzz2TqoMfV7ee61Egf5y6NkcO4FB/1iCCQnbeiI1F3xzv3vK5dBCXUCLQgGYS+mUeigK1iKQzvED+QnQ==, tarball: https://registry.npmmirror.com/@types/conventional-commits-parser/-/conventional-commits-parser-5.0.1.tgz}
 
+  '@types/crypto-js@4.2.2':
+    resolution: {integrity: sha512-sDOLlVbHhXpAUAL0YHDUUwDZf3iN4Bwi4W6a0W0b+QcAezUbRtH4FVb+9J4h+XFPW7l/gQ9F8qC7P+Ec4k8QVQ==, tarball: https://registry.npmmirror.com/@types/crypto-js/-/crypto-js-4.2.2.tgz}
+
   '@types/d3-array@3.2.1':
     resolution: {integrity: sha512-Y2Jn2idRrLzUfAKV2LyRImR+y4oa2AntrgID95SHJxuMUrkNXmanDSed71sRNZysveJVt1hLLemQZIady0FpEg==, tarball: https://registry.npmmirror.com/@types/d3-array/-/d3-array-3.2.1.tgz}
 
@@ -1859,9 +1859,6 @@ packages:
 
   '@types/nprogress@0.2.3':
     resolution: {integrity: sha512-k7kRA033QNtC+gLc4VPlfnue58CM1iQLgn1IMAU8VPHGOj7oIHPp9UlhedEnD/Gl8evoCjwkZjlBORtZ3JByUA==, tarball: https://registry.npmmirror.com/@types/nprogress/-/nprogress-0.2.3.tgz}
-
-  '@types/pako@2.0.3':
-    resolution: {integrity: sha512-bq0hMV9opAcrmE0Byyo0fY3Ew4tgOevJmQ9grUhpXQhYfyLJ1Kqg3P33JT5fdbT2AjeAjR51zqqVjAL/HMkx7Q==, tarball: https://registry.npmmirror.com/@types/pako/-/pako-2.0.3.tgz}
 
   '@types/qrcode@1.5.5':
     resolution: {integrity: sha512-CdfBi/e3Qk+3Z/fXYShipBT13OJ2fDO2Q2w5CIP5anLTLIndQG9z6P1cnm+8zCWSpm5dnxMFd/uREtb0EXuQzg==, tarball: https://registry.npmmirror.com/@types/qrcode/-/qrcode-1.5.5.tgz}
@@ -4788,9 +4785,6 @@ packages:
   package-manager-detector@0.2.8:
     resolution: {integrity: sha512-ts9KSdroZisdvKMWVAVCXiKqnqNfXz4+IbrBG8/BWx/TR5le+jfenvoBuIZ6UWM9nz47W7AbD9qYfAwfWMIwzA==, tarball: https://registry.npmmirror.com/package-manager-detector/-/package-manager-detector-0.2.8.tgz}
 
-  pako@2.1.0:
-    resolution: {integrity: sha512-w+eufiZ1WuJYgPXbV/PO3NCMEc3xqylkKHzp8bxp1uW4qaSNQUkwmLLEc3kKsfz8lpV1F8Ht3U1Cm+9Srog2ug==, tarball: https://registry.npmmirror.com/pako/-/pako-2.1.0.tgz}
-
   parent-module@1.0.1:
     resolution: {integrity: sha512-GQ2EWRpQV8/o+Aw8YqtfZZPfNRWZYkbidE9k5rpl/hC3vtHHBfGm2Ifi6qWV+coDGkrUKZAxE3Lot5kcsRlh+g==, tarball: https://registry.npmmirror.com/parent-module/-/parent-module-1.0.1.tgz}
     engines: {node: '>=6'}
@@ -7658,6 +7652,8 @@ snapshots:
     dependencies:
       '@types/node': 20.17.14
 
+  '@types/crypto-js@4.2.2': {}
+
   '@types/d3-array@3.2.1': {}
 
   '@types/d3-axis@3.0.6':
@@ -7801,8 +7797,6 @@ snapshots:
       undici-types: 6.19.8
 
   '@types/nprogress@0.2.3': {}
-
-  '@types/pako@2.0.3': {}
 
   '@types/qrcode@1.5.5':
     dependencies:
@@ -11217,8 +11211,6 @@ snapshots:
   package-json-from-dist@1.0.1: {}
 
   package-manager-detector@0.2.8: {}
-
-  pako@2.1.0: {}
 
   parent-module@1.0.1:
     dependencies:

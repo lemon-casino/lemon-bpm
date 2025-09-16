@@ -77,9 +77,11 @@ import * as UserApi from '@/api/system/user'
 defineOptions({ name: 'InfraWebSocket' })
 
 const message = useMessage() // 消息弹窗
-
+const wsPrefix = import.meta.env.PROD
+  ? window.location.origin + (import.meta.env.NGINX_BASE_URL || '/baoxuan')
+  : import.meta.env.VITE_BASE_URL
 const server = ref(
-  (import.meta.env.VITE_BASE_URL + '/infra/ws').replace('http', 'ws') +
+  (wsPrefix + '/infra/ws').replace('http', 'ws') +
     '?token=' +
     getRefreshToken() // 使用 getRefreshToken() 方法，而不使用 getAccessToken() 方法的原因：WebSocket 无法方便的刷新访问令牌
 ) // WebSocket 服务地址
@@ -119,28 +121,6 @@ watchEffect(() => {
     }
     // 2.2 消息类型：demo-message-receive
     if (type === 'demo-message-receive') {
-      // 检查是否是表单协作消息（JSON格式且包含协作消息类型）
-      try {
-        const collaborationMessage = JSON.parse(content.text)
-        const collaborationTypes = [
-          'FORM_FIELD_LOCK',
-          'FORM_FIELD_UNLOCK', 
-          'FORM_FIELD_CHANGE',
-          'FORM_CURSOR_POSITION',
-          'USER_EDITING_STATUS',
-          'ONLINE_CHECK_REQUEST',
-          'ONLINE_CHECK_RESPONSE'
-        ]
-        
-        if (collaborationMessage.type && collaborationTypes.includes(collaborationMessage.type)) {
-          // 这是表单协作消息，不在消息记录中显示
-          console.log('过滤表单协作消息:', collaborationMessage.type)
-          return
-        }
-      } catch (e) {
-        // 不是JSON格式，继续正常处理
-      }
-      
       const single = content.single
       if (single) {
         messageList.value.push({

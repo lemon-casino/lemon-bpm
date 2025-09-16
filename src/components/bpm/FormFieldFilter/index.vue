@@ -27,19 +27,46 @@
           </el-select>
         </el-col>
 
-        <!-- 日期选择器 - 仅在showDateRange为true时显示 -->
-        <el-col v-if="props.showDateRange" :xs="24" :sm="24" :md="12" :lg="6" :xl="8">
-          <el-date-picker
-            v-model="dateRange"
-            type="daterange"
-            value-format="YYYY-MM-DD HH:mm:ss"
-            :start-placeholder="props.startDatePlaceholder"
-            :end-placeholder="props.endDatePlaceholder"
-            class="date-picker w-full"
-            :default-time="[new Date('1 00:00:00'), new Date('1 23:59:59')]"
-            @change="handleDateRangeChange"
-          />
-        </el-col>
+        <!-- 移动端友好的日期选择器 - 仅在showDateRange为true时显示 -->
+        <template v-if="props.showDateRange">
+          <!-- 桌面端：使用日期范围选择器 -->
+          <el-col v-if="!isMobileDevice" :xs="24" :sm="24" :md="12" :lg="6" :xl="8">
+            <el-date-picker
+              v-model="dateRange"
+              type="daterange"
+              value-format="YYYY-MM-DD HH:mm:ss"
+              :start-placeholder="props.startDatePlaceholder"
+              :end-placeholder="props.endDatePlaceholder"
+              class="date-picker w-full"
+              :default-time="[new Date('1 00:00:00'), new Date('1 23:59:59')]"
+              @change="handleDateRangeChange"
+            />
+          </el-col>
+          
+          <!-- 移动端：使用分离的开始和结束日期选择器 -->
+          <template v-else>
+            <el-col :xs="24" :sm="12" :md="6" :lg="3" :xl="4">
+              <el-date-picker
+                v-model="startDate"
+                type="date"
+                value-format="YYYY-MM-DD"
+                :placeholder="props.startDatePlaceholder"
+                class="mobile-date-picker w-full"
+                @change="handleMobileDateChange"
+              />
+            </el-col>
+            <el-col :xs="24" :sm="12" :md="6" :lg="3" :xl="4">
+              <el-date-picker
+                v-model="endDate"
+                type="date"
+                value-format="YYYY-MM-DD"
+                :placeholder="props.endDatePlaceholder"
+                class="mobile-date-picker w-full"
+                @change="handleMobileDateChange"
+              />
+            </el-col>
+          </template>
+        </template>
 
 
         <el-col :xs="24" :sm="12" :md="6" :lg="6" :xl="4">
@@ -348,6 +375,9 @@ const modelId = ref<string | undefined>(props.initialModelId)
 const formFieldValue = ref<string>(props.initialFormFieldValue)
 const startUserId = ref<string | number | undefined>(props.initialStartUserId)
 const dateRange = ref<any[]>(props.initialDateRange || [])
+// 移动端分离的日期选择器
+const startDate = ref<string>('')
+const endDate = ref<string>('')
 const modelList = ref<any[]>([])
 const formFields = ref<FormField[]>([])
 const selectedField = ref<string>('')
@@ -357,6 +387,14 @@ const selectedOperator = ref<'equals' | 'isEmpty' | 'notEmpty'>('equals') // 默
 const fieldValue = ref<any>(null)
 const conditions = ref<Condition[]>([])
 const userList = ref<any[]>([])
+
+// 移动设备检测
+const isMobileDevice = computed(() => {
+  if (typeof window !== 'undefined') {
+    return window.innerWidth <= 768
+  }
+  return false
+})
 
 // 计算属性：是否可以添加条件
 const canAddCondition = computed(() => {
@@ -693,6 +731,32 @@ const handleDateRangeChange = () => {
   emitChange()
 }
 
+/** 处理移动端日期变更 */
+const handleMobileDateChange = () => {
+  // 将分离的开始和结束日期合并为日期范围
+  if (startDate.value && endDate.value) {
+    dateRange.value = [
+      `${startDate.value} 00:00:00`,
+      `${endDate.value} 23:59:59`
+    ]
+  } else if (startDate.value) {
+    dateRange.value = [
+      `${startDate.value} 00:00:00`,
+      `${startDate.value} 23:59:59`
+    ]
+  } else if (endDate.value) {
+    dateRange.value = [
+      `${endDate.value} 00:00:00`,
+      `${endDate.value} 23:59:59`
+    ]
+  } else {
+    dateRange.value = []
+  }
+  
+  emit('update:dateRange', dateRange.value)
+  emitChange()
+}
+
 /** 发送变更事件 */
 const emitChange = () => {
   // 更新modelId
@@ -724,6 +788,9 @@ const resetFields = () => {
   conditions.value = []
   startUserId.value = undefined
   dateRange.value = []
+  // 重置移动端日期字段
+  startDate.value = ''
+  endDate.value = ''
   
   emitChange()
 }
@@ -736,6 +803,12 @@ onMounted(async () => {
   // 如果有初始模型ID，加载表单字段
   if (modelId.value) {
     await fetchFormFields()
+  }
+  
+  // 初始化移动端日期字段
+  if (dateRange.value && dateRange.value.length === 2) {
+    startDate.value = dateRange.value[0].split(' ')[0]
+    endDate.value = dateRange.value[1].split(' ')[0]
   }
 })
 
@@ -2845,34 +2918,6 @@ defineExpose({
   margin-right: 8px;
 }
 
-.rule-item {
-  width: 80px;
-}
-
-.field-item {
-  width: 160px;
-}
-
-.value-item {
-  width: 180px;
-}
-
-.conditions-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.condition-tag {
-  margin-right: 4px;
-  margin-bottom: 4px;
-}
-
-.filter-item {
-  margin-right: 8px;
-}
-
 /* 统一表单控件样式 */
 :deep(.el-input__wrapper),
 :deep(.el-select),
@@ -2906,6 +2951,136 @@ defineExpose({
 
 :deep(.el-button) {
   height: 36px !important;
+}
+
+/* 移动端日期选择器样式 */
+.mobile-date-picker {
+  @media (max-width: 768px) {
+    :deep(.el-input__wrapper) {
+      height: 44px !important;
+      padding: 0 12px !important;
+      border-radius: 8px !important;
+      border: 1px solid var(--el-border-color) !important;
+      
+      .el-input__inner {
+        height: 42px !important;
+        line-height: 42px !important;
+        font-size: 16px !important;
+        text-align: center;
+        
+        &::placeholder {
+          font-size: 14px !important;
+          color: var(--el-text-color-placeholder) !important;
+        }
+      }
+      
+      .el-input__suffix {
+        .el-input__suffix-inner {
+          .el-icon {
+            font-size: 18px !important;
+            color: var(--el-color-primary) !important;
+          }
+        }
+      }
+    }
+  }
+  
+  @media (max-width: 480px) {
+    :deep(.el-input__wrapper) {
+      height: 48px !important;
+      
+      .el-input__inner {
+        height: 46px !important;
+        line-height: 46px !important;
+        font-size: 16px !important;
+      }
+    }
+  }
+}
+
+/* 移动端日期选择器弹出面板优化 */
+:deep(.el-picker-panel) {
+  @media (max-width: 768px) {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 90vw !important;
+    max-width: 350px !important;
+    max-height: 80vh !important;
+    border-radius: 12px !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
+    z-index: 9999 !important;
+    
+    .el-date-table {
+      th {
+        padding: 8px 4px !important;
+        font-size: 12px !important;
+      }
+      
+      td {
+        padding: 0 !important;
+        width: 32px !important;
+        height: 32px !important;
+        
+        .cell {
+          width: 32px !important;
+          height: 32px !important;
+          line-height: 32px !important;
+          font-size: 14px !important;
+          border-radius: 6px !important;
+          
+          &:hover {
+            background-color: var(--el-color-primary-light-9) !important;
+          }
+        }
+        
+        &.current:not(.disabled) .cell {
+          background-color: var(--el-color-primary) !important;
+          color: #fff !important;
+        }
+      }
+    }
+    
+    .el-picker-panel__header {
+      padding: 12px 16px !important;
+      border-bottom: 1px solid var(--el-border-color-lighter) !important;
+      
+      .el-picker-panel__icon-btn {
+        width: 32px !important;
+        height: 32px !important;
+        line-height: 32px !important;
+        border-radius: 6px !important;
+        
+        &:hover {
+          background-color: var(--el-color-primary-light-9) !important;
+        }
+      }
+    }
+    
+    .el-picker-panel__content {
+      padding: 12px !important;
+    }
+    
+    .el-picker-panel__footer {
+      padding: 8px 16px 12px !important;
+      border-top: 1px solid var(--el-border-color-lighter) !important;
+      
+      .el-button {
+        height: 36px !important;
+        padding: 0 16px !important;
+        border-radius: 6px !important;
+        font-size: 14px !important;
+      }
+    }
+  }
+}
+
+/* 移动端遮罩层 */
+:deep(.el-overlay) {
+  @media (max-width: 768px) {
+    background-color: rgba(0, 0, 0, 0.5) !important;
+  }
 }
 
 </style>

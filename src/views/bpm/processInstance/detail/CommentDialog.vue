@@ -89,8 +89,6 @@
             />
           </el-divider>
         </div>
-
-        <!-- 测试按钮 -->
         <div class="test-buttons" style="margin-bottom: 8px;">
           <el-button 
             size="small" 
@@ -169,6 +167,7 @@
           <Editor
             v-model="commentForm.content"
             :editor-config="editorConfig"
+            :toolbar-config="toolbarConfig"
             :height="editorHeight"
             @change="handleEditorChange"
             @on-change="handleEditorChange"
@@ -238,13 +237,12 @@
       v-if="showMentionModal"
       :position="mentionModalPosition"
       @select="handleUserSelect"
-      @close="showMentionModal = false"
+      @close="closeMentionModal"
     />
   </Teleport>
 </template>
 
 <script lang="ts" setup>
-import MarkdownView from '@/components/MarkdownView/index.vue'
 import { IEditorConfig } from '@wangeditor/editor'
 import { getRefreshToken, getTenantId } from '@/utils/auth'
 import { getUploadUrl } from '@/components/UploadFile/src/useUpload'
@@ -413,6 +411,14 @@ watch(() => dialogVisible.value, (val) => {
     }
     // 关闭附件抽屉
     attachmentDrawerOpen.value = false;
+    // 关闭@用户弹窗
+    if (showMentionModal.value) {
+      showMentionModal.value = false;
+      console.log('对话框关闭，同时关闭@用户弹窗');
+    }
+    // 重置@用户相关状态
+    isSelectingUser.value = false;
+    isAtting.value = false;
     console.log('对话框关闭，清理资源');
     // 对话框关闭时重置编辑器状态
     editorReady.value = false;
@@ -550,7 +556,7 @@ const handleUserSelect = async (user) => {
     // 标记为正在选择用户状态，防止弹窗被意外关闭
     isSelectingUser.value = true;
     
-    // 先关闭弹窗，避免干扰后续操作
+    // 立即关闭弹窗
     showMentionModal.value = false;
     console.log('关闭用户选择弹窗');
 
@@ -589,7 +595,7 @@ const handleUserSelect = async (user) => {
       isSelectingUser.value = false;
       isAtting.value = false; // 清除@用户状态
       console.log('用户选择状态重置');
-    }, 300);
+    }, 100); // 缩短延迟时间
   }
 }
 
@@ -808,9 +814,31 @@ const insertUserMention = async (id, nickname, avatar) => {
 
 /** 关闭用户选择弹窗 */
 const closeMentionModal = () => {
+  console.log('手动关闭@用户弹窗');
   showMentionModal.value = false;
   currentMentionRange.value = null;
+  // 重置相关状态
+  isSelectingUser.value = false;
+  isAtting.value = false;
 }
+
+// 工具栏配置
+const toolbarConfig = computed(() => {
+  return {
+    excludeKeys: [
+      'insertVideo',      // 插入视频
+      'uploadVideo',      // 上传视频
+      'insertTable',      // 插入表格
+      'deleteTable',      // 删除表格
+      'insertTableRow',   // 插入表格行
+      'deleteTableRow',   // 删除表格行
+      'insertTableCol',   // 插入表格列
+      'deleteTableCol',   // 删除表格列
+      'tableHeader',      // 表格表头
+      'tableFullWidth'    // 表格宽度
+    ]
+  }
+})
 
 // 编辑器配置
 const editorConfig = computed((): IEditorConfig => {
@@ -864,17 +892,20 @@ const editorConfig = computed((): IEditorConfig => {
         hideModal: () => {
           console.log('EXTEND_CONF.mentionConfig.hideModal被调用');
 
-          // 如果正在选择用户或正在@用户，则不关闭弹窗
-          if (isSelectingUser.value || isAtting.value) {
-            console.log('正在选择用户或@用户过程中，阻止弹窗关闭');
+          // 如果正在选择用户，则不关闭弹窗
+          if (isSelectingUser.value) {
+            console.log('正在选择用户过程中，阻止弹窗关闭');
             return;
           }
 
-          // 增加延迟，防止意外的快速关闭
+          // 延迟关闭，避免与用户选择冲突
           setTimeout(() => {
-            showMentionModal.value = false;
-            console.log('关闭弹窗');
-          }, 300);
+            if (!isSelectingUser.value) {
+              showMentionModal.value = false;
+              isAtting.value = false;
+              console.log('编辑器配置触发关闭弹窗');
+            }
+          }, 150);
         },
       },
     },
@@ -1585,25 +1616,54 @@ onBeforeUnmount(() => {
 
 // 全局点击事件处理函数
 const handleGlobalClick = (e) => {
-  // 如果点击的是编辑器区域，并且弹窗显示中，阻止编辑器获取焦点
-  const isEditorArea = e.target.closest('.editor-container') || 
-                        e.target.closest('.w-e-text-container') || 
-                        e.target.closest('.w-e-toolbar');
+  // 检查点击的目标元素
+  const target = e.target;
+  const isEditorArea = target.closest('.editor-container') || 
+                        target.closest('.w-e-text-container') || 
+                        target.closest('.w-e-toolbar');
                         
-  const isMentionModal = e.target.closest('.mention-modal');
+  const isMentionModal = target.closest('.mention-modal');
+  const isMentionButton = target.closest('.test-buttons') || 
+                          target.textContent?.includes('@') || 
+                          target.closest('[title="@用户"]');
   
-  if (showMentionModal.value && isEditorArea && !isMentionModal) {
-    // 阻止编辑器获取焦点
-    e.preventDefault();
-    e.stopPropagation();
-    console.log('阻止编辑器获取焦点');
+  console.log('全局点击事件:', {
+    showMentionModal: showMentionModal.value,
+    isSelectingUser: isSelectingUser.value,
+    isAtting: isAtting.value,
+    isEditorArea: !!isEditorArea,
+    isMentionModal: !!isMentionModal,
+    isMentionButton: !!isMentionButton,
+    targetElement: target.tagName,
+    targetClass: target.className
+  });
+  
+  // 如果点击的是@用户按钮，不处理关闭逻辑
+  if (isMentionButton) {
+    console.log('点击了@用户按钮，不关闭弹窗');
     return;
   }
   
-  // 如果弹窗显示中，且不是正在选择用户或@用户状态，且点击区域不是弹窗，则关闭弹窗
-  if (showMentionModal.value && !isSelectingUser.value && !isAtting.value && !isMentionModal) {
-    console.log('全局点击，关闭弹窗');
-    showMentionModal.value = false;
+  // 如果弹窗显示中，且点击的不是弹窗内部，则关闭弹窗
+  if (showMentionModal.value && !isMentionModal) {
+    // 给一个短暂的延迟，确保不会干扰正在进行的用户选择
+    if (!isSelectingUser.value) {
+      console.log('点击外部区域，关闭@用户弹窗');
+      showMentionModal.value = false;
+      // 重置相关状态
+      isAtting.value = false;
+    } else {
+      console.log('正在选择用户，暂不关闭弹窗');
+    }
+    return;
+  }
+  
+  // 如果点击的是编辑器区域，并且弹窗显示中，阻止编辑器获取焦点
+  if (showMentionModal.value && isEditorArea && !isMentionModal) {
+    console.log('弹窗显示中，阻止编辑器获取焦点');
+    e.preventDefault();
+    e.stopPropagation();
+    return;
   }
 };
 

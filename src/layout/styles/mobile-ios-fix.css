@@ -1,0 +1,144 @@
+/* iOS移动端布局修复样式 */
+
+/* 基础iOS移动端修复 */
+.ios-mobile {
+  background-color: var(--app-content-bg-color) !important;
+}
+
+.ios-mobile body {
+  background-color: var(--app-content-bg-color) !important;
+  min-height: 100vh !important;
+}
+
+/* 检测iOS设备的通用修复 */
+@supports (-webkit-touch-callout: none) {
+  @media (max-width: 768px) {
+    /* 确保根元素背景色正确 */
+    html, body {
+      background-color: var(--app-content-bg-color) !important;
+      min-height: 100vh !important;
+    }
+    
+    /* 修复布局容器背景色 - 使用实际的类名 */
+    [class*="layout"] {
+      background-color: var(--app-content-bg-color) !important;
+      min-height: 100vh !important;
+    }
+    
+    /* 确保左侧菜单背景色正确 */
+    .layout-border__right {
+      background-color: var(--left-menu-bg-color) !important;
+    }
+    
+    /* 确保内容区域背景色正确 */
+    [class*="layout-content"] {
+      background-color: var(--app-content-bg-color) !important;
+      min-height: 100vh !important;
+    }
+    
+    /* 确保滚动容器背景色正确 */
+    [class*="layout-content-scrollbar"] {
+      background-color: var(--app-content-bg-color) !important;
+    }
+    
+    /* 修复顶部工具栏背景色 */
+    [class*="layout-content-scrollbar"] > div:first-child {
+      background-color: var(--top-header-bg-color) !important;
+    }
+    
+    /* 修复面包屑容器背景色 */
+    [id="v-tool-header"] {
+      background-color: var(--top-header-bg-color) !important;
+    }
+    
+    /* 修复面包屑组件背景色 */
+    .v-tool-header {
+      background-color: var(--top-header-bg-color) !important;
+    }
+    
+    /* 修复面包屑内部元素背景色 */
+    .v-tool-header > div {
+      background-color: transparent !important;
+    }
+    
+    /* 修复Element Plus面包屑组件背景色 */
+    .el-breadcrumb {
+      background-color: transparent !important;
+    }
+    
+    /* 修复面包屑项目背景色 */
+    .el-breadcrumb__item {
+      background-color: transparent !important;
+    }
+    
+    /* 修复所有布局模式下的ToolHeader背景色 */
+    [class*="bg-[var(--top-header-bg-color)]"] {
+      background-color: var(--top-header-bg-color) !important;
+    }
+    
+    /* 确保移动端菜单遮罩层正确显示 */
+    [class*="layout"] > div[class*="absolute"][class*="backdrop-blur"] {
+      background-color: rgba(0, 0, 0, 0.3) !important;
+      backdrop-filter: blur(4px) !important;
+    }
+    
+    /* 修复AppView背景色 */
+    section[class*="bg-[var(--app-content-bg-color)]"] {
+      background-color: var(--app-content-bg-color) !important;
+    }
+    
+    /* 修复可能的透明背景问题 */
+    [class*="layout-content"],
+    [class*="layout-content-scrollbar"],
+    [class*="layout-content-scrollbar"] .el-scrollbar__wrap,
+    [class*="layout-content-scrollbar"] .el-scrollbar__view {
+      background-color: var(--app-content-bg-color) !important;
+    }
+    
+    /* 确保移动端菜单有正确的背景和层级 */
+    [class*="menu"] {
+      background-color: var(--left-menu-bg-color) !important;
+      z-index: 3001 !important;
+    }
+    
+    /* 修复iOS Safari中的视口问题 */
+    @supports (height: 100dvh) {
+      html, body, [class*="layout"] {
+        min-height: 100dvh !important;
+      }
+    }
+    
+    /* 修复可能的白屏闪烁问题 */
+    [class*="layout"],
+    [class*="layout-content"],
+    [class*="layout-content-scrollbar"] {
+      transition: background-color 0.1s ease !important;
+    }
+  }
+}
+
+/* 暗色主题支持 */
+@supports (-webkit-touch-callout: none) {
+  @media (max-width: 768px) and (prefers-color-scheme: dark) {
+    html, body, [class*="layout"], [class*="layout-content"], [class*="layout-content-scrollbar"] {
+      background-color: var(--el-bg-color) !important;
+    }
+  }
+}
+
+/* Element Plus组件背景色修复 */
+@supports (-webkit-touch-callout: none) {
+  @media (max-width: 768px) {
+    .el-scrollbar {
+      background-color: var(--app-content-bg-color) !important;
+    }
+    
+    .el-scrollbar__wrap {
+      background-color: var(--app-content-bg-color) !important;
+    }
+    
+    .el-scrollbar__view {
+      background-color: var(--app-content-bg-color) !important;
+    }
+  }
+}

@@ -11,7 +11,7 @@ export interface WebSocketMessage {
 // 表单协同编辑消息类型
 export enum FormCollaborationMessageType {
   FORM_FIELD_LOCK = 'FORM_FIELD_LOCK',
-  FORM_FIELD_UNLOCK = 'FORM_FIELD_UNLOCK', 
+  FORM_FIELD_UNLOCK = 'FORM_FIELD_UNLOCK',
   FORM_FIELD_CHANGE = 'FORM_FIELD_CHANGE',
   FORM_CURSOR_POSITION = 'FORM_CURSOR_POSITION',
   USER_EDITING_STATUS = 'USER_EDITING_STATUS',
@@ -35,11 +35,15 @@ export interface MessageContent {
 export const useWebSocketMessage = () => {
   // 初始化用户store
   const userStore = useUserStore()
-  
+
   // WebSocket 连接
-  const wsUrl = (import.meta.env.VITE_BASE_URL + '/infra/ws').replace('http', 'ws') + 
+  const wsPrefix = import.meta.env.PROD
+    ? window.location.origin + (import.meta.env.NGINX_BASE_URL || '/baoxuan')
+    : import.meta.env.VITE_BASE_URL
+  const wsUrl =
+    (wsPrefix + '/infra/ws').replace('http', 'ws') +
     '?token=' + getRefreshToken()
-  
+
   const { data, status, send, open, close } = useWebSocket(wsUrl, {
     autoReconnect: {
       retries: 5,
@@ -53,12 +57,12 @@ export const useWebSocketMessage = () => {
       interval: 30000
     }
   })
-  
+
   // 连接状态监听
   watch(() => status.value, (newStatus, oldStatus) => {
     console.log(`WebSocket连接状态变化: ${oldStatus} -> ${newStatus}`)
   })
-  
+
   // 连接初始化标志
   const isInitialized = ref(false)
 
@@ -66,10 +70,10 @@ export const useWebSocketMessage = () => {
   const bpmChannel = new BroadcastChannel('bpm-process-channel')
   // 标记通道是否已关闭
   let isBpmChannelClosed = false
-  
+
   // 消息队列，存储连接未打开时的消息
   const messageQueue = ref<{toUserId: number, text: string}[]>([])
-  
+
   // 新的消息队列结构，支持优先级和重试
   interface QueuedMessage {
     targetUserId: number
@@ -79,16 +83,16 @@ export const useWebSocketMessage = () => {
     retryCount: number
     priority: 'high' | 'normal'
   }
-  
+
   const priorityMessageQueue = ref<QueuedMessage[]>([])
-  
+
   // 生成消息ID
   const generateMessageId = () => {
     return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   }
 
 
-  
+
   // 添加消息到队列
   const addToQueue = (messageData: QueuedMessage) => {
     if (messageData.priority === 'high') {
@@ -100,16 +104,16 @@ export const useWebSocketMessage = () => {
     }
     console.log(`消息已加入队列，当前队列长度: ${priorityMessageQueue.value.length}`)
   }
-  
+
   // 检查连接并尝试重连
   const ensureConnection = async () => {
     // 如果连接已打开，直接返回成功
     if (status.value === 'OPEN') {
       return true
     }
-    
+
     console.log('WebSocket连接未打开，尝试重新连接...')
-    
+
     // 如果连接正在进行中，等待一段时间
     if (status.value === 'CONNECTING') {
       console.log('WebSocket正在连接中，等待连接完成...')
@@ -121,7 +125,7 @@ export const useWebSocketMessage = () => {
           unwatch()
           resolve(false)
         }, 5000)
-        
+
         // 监听状态变化
         const unwatch = watch(() => status.value, (newStatus) => {
           if (newStatus === 'OPEN') {
@@ -138,7 +142,7 @@ export const useWebSocketMessage = () => {
         }, { immediate: true })
       })
     }
-    
+
     // 如果连接已关闭，尝试重新打开
     if (status.value === 'CLOSED') {
       try {
@@ -148,7 +152,7 @@ export const useWebSocketMessage = () => {
         await new Promise(resolve => setTimeout(resolve, 500))
         // 重新打开连接
         open()
-        
+
         // 等待连接完成或超时
         return new Promise((resolve) => {
           // 设置超时
@@ -157,7 +161,7 @@ export const useWebSocketMessage = () => {
             unwatch()
             resolve(false)
           }, 5000)
-          
+
           // 监听状态变化
           const unwatch = watch(() => status.value, (newStatus) => {
             if (newStatus === 'OPEN') {
@@ -178,20 +182,20 @@ export const useWebSocketMessage = () => {
         return false
       }
     }
-    
+
     return false
   }
-  
+
   // 处理消息队列
   const processMessageQueue = () => {
     // 处理旧的消息队列
     if (messageQueue.value.length > 0 && status.value === 'OPEN') {
       console.log(`处理旧消息队列，共有 ${messageQueue.value.length} 条消息待发送`)
-      
+
       // 复制队列并清空原队列
       const queueToProcess = [...messageQueue.value]
       messageQueue.value = []
-      
+
       // 发送队列中的消息
       queueToProcess.forEach(msg => {
         try {
@@ -201,7 +205,7 @@ export const useWebSocketMessage = () => {
             toUserId: msg.toUserId,
             text: msg.text
           }
-          
+
           console.log('从队列发送demo-message-send消息:', demoMessage)
           send(JSON.stringify(demoMessage))
         } catch (error) {
@@ -211,15 +215,15 @@ export const useWebSocketMessage = () => {
         }
       })
     }
-    
+
     // 处理新的优先级消息队列
     if (priorityMessageQueue.value.length > 0 && status.value === 'OPEN') {
       console.log(`处理优先级消息队列，共有 ${priorityMessageQueue.value.length} 条消息待发送`)
-      
+
       // 复制队列并清空原队列
       const queueToProcess = [...priorityMessageQueue.value]
       priorityMessageQueue.value = []
-      
+
       // 发送队列中的消息
       queueToProcess.forEach(messageData => {
         try {
@@ -239,10 +243,10 @@ export const useWebSocketMessage = () => {
       })
     }
   }
-  
+
   // 定时处理消息队列
   let queueProcessInterval: number | null = null
-  
+
   // 启动队列处理定时器
   const startQueueProcessor = () => {
     if (queueProcessInterval === null) {
@@ -254,7 +258,7 @@ export const useWebSocketMessage = () => {
       console.log('启动WebSocket消息队列处理定时器')
     }
   }
-  
+
   // 停止队列处理定时器
   const stopQueueProcessor = () => {
     if (queueProcessInterval !== null) {
@@ -263,7 +267,7 @@ export const useWebSocketMessage = () => {
       console.log('停止WebSocket消息队列处理定时器')
     }
   }
-  
+
   // 消息发送状态统计
   const messageSendStats = ref({
     totalSent: 0,
@@ -282,7 +286,7 @@ export const useWebSocketMessage = () => {
     console.log(`  消息队列长度: ${messageQueue.value.length}`)
     console.log(`  优先级队列长度: ${priorityMessageQueue.value.length}`)
     console.log(`  发送统计: 总计${messageSendStats.value.totalSent}, 成功${messageSendStats.value.successCount}, 失败${messageSendStats.value.failureCount}`)
-    
+
     if (status.value === 'OPEN') {
       console.log('🔗 连接正常，发送测试ping消息')
       sendMessage(userStore.getUser?.id || 0, {
@@ -296,13 +300,13 @@ export const useWebSocketMessage = () => {
   const monitorServerResponse = (messageType: string, targetUserId: number) => {
     const monitorId = `${messageType}_${targetUserId}_${Date.now()}`
     console.log(`📊 开始监控服务端响应: ${monitorId}`)
-    
+
     // 5秒后检查是否收到服务端的任何响应
     setTimeout(() => {
       console.log(`⏰ 服务端响应监控超时: ${monitorId}`)
       console.log(`💡 建议检查服务端是否正确注册了 ${messageType} 类型的监听器`)
     }, 5000)
-    
+
     return monitorId
   }
 
@@ -325,6 +329,7 @@ export const useWebSocketMessage = () => {
    * @param userId 目标用户ID
    * @param message 消息内容
    * @param priority 消息优先级（高优先级消息会优先发送）
+   * @param messageId 模型ID
    * @returns Promise<boolean> 返回发送是否成功
    */
   const sendMessage = async (
@@ -333,8 +338,8 @@ export const useWebSocketMessage = () => {
     priority: 'high' | 'normal' = 'normal',
     messageId?: string
   ): Promise<boolean> => {
-    if (!userId || !message) {
-      console.warn('发送消息失败：用户ID或消息内容为空')
+    if (!message) {
+      console.warn('发送消息失败 消息内容为空')
       return false
     }
 
@@ -350,8 +355,10 @@ export const useWebSocketMessage = () => {
     // 构造符合后端期望的demo-message-send格式
     const demoMessage = {
       type: 'demo-message-send',  // 🔧 添加必需的type字段
-      toUserId: userId,  // 后端期望的目标用户ID字段
       text: JSON.stringify(originalMessage)  // 直接发送JSON字符串，不压缩
+    }
+    if (userId !== 0) {
+      demoMessage['toUserId'] = userId // 后端期望的目标用户ID字段
     }
 
     console.log(`📤 准备发送demo-message-send给用户 ${userId}:`, message.type)
@@ -363,29 +370,29 @@ export const useWebSocketMessage = () => {
         console.log(`📤 发送的demo-message-send JSON:`, messageString)
         send(messageString)
         console.log(`✅ demo-message-send已发送给用户 ${userId}`)
-        
+
         // 更新发送统计
         messageSendStats.value.totalSent++
         messageSendStats.value.successCount++
         messageSendStats.value.lastSendTime = Date.now()
-        
+
         // 启动服务端响应监控
         monitorServerResponse('demo-message-send', userId)
-        
+
         return true
       } catch (error: any) {
         console.error(`❌ 发送demo-message-send失败，加入队列:`, error)
-        
+
         // 更新发送统计
         messageSendStats.value.totalSent++
         messageSendStats.value.failureCount++
         messageSendStats.value.recentErrors.push(`${error.message} - ${new Date().toISOString()}`)
-        
+
         // 保持最近10个错误记录
         if (messageSendStats.value.recentErrors.length > 10) {
           messageSendStats.value.recentErrors.shift()
         }
-        
+
         addToQueue({
           targetUserId: userId,
           message: demoMessage,
@@ -438,7 +445,7 @@ export const useWebSocketMessage = () => {
         console.warn('广播通道已关闭，无法发送消息')
         return false
       }
-      
+
       bpmChannel.postMessage({
         type,
         data,
@@ -456,12 +463,12 @@ export const useWebSocketMessage = () => {
     // 返回 watchEffect 的停止函数，用于清理监听器
     return watchEffect(() => {
       console.log('🔍 WebSocket data.value 变化:', data.value, '类型:', typeof data.value)
-      
+
       if (!data.value) {
         console.log('❌ data.value 为空，跳过处理')
         return
       }
-      
+
       try {
         // 心跳消息处理
         if (data.value === 'pong') {
@@ -470,7 +477,7 @@ export const useWebSocketMessage = () => {
         }
 
         console.log('📨 WebSocket收到原始数据:', data.value)
-        
+
         // 尝试解析JSON
         let parsedData
         try {
@@ -480,14 +487,14 @@ export const useWebSocketMessage = () => {
           console.error('❌ JSON解析失败:', parseError, '原始数据:', data.value)
           return
         }
-        
+
         // 🔧 处理demo-message-receive类型的消息
         if (parsedData && typeof parsedData === 'object') {
           if (parsedData.type === 'demo-message-receive') {
             console.log('📥 收到demo-message-receive消息')
-            
+
             let messageContent: MessageContent = {} as MessageContent
-            
+
             // 检查是否有content字段（新格式）
             if (parsedData.content) {
               console.log('📦 处理content字段中的消息')
@@ -495,7 +502,7 @@ export const useWebSocketMessage = () => {
                 // 先解析content字段的JSON
                 const contentData = JSON.parse(parsedData.content)
                 console.log('📋 content解析结果:', contentData)
-                
+
                 // 检查content中是否有text字段，直接解析JSON
                 if (contentData.text) {
                   console.log('📦 解析text字段中的JSON消息')
@@ -536,7 +543,7 @@ export const useWebSocketMessage = () => {
               console.warn('⚠️ demo-message-receive消息缺少content和text字段')
               messageContent = parsedData as MessageContent
             }
-            
+
             console.log('📋 最终处理的消息:', {
               type: messageContent.type || 'demo-message-receive',
               fromUserId: messageContent.fromUserId,
@@ -608,24 +615,24 @@ export const useWebSocketMessage = () => {
     }
     return isInitialized.value
   }
-  
+
   // 组件卸载时清理资源
   onUnmounted(() => {
     console.log('组件卸载，清理WebSocket资源')
-    
+
     // 停止队列处理器
     stopQueueProcessor()
-    
+
     // 标记通道已关闭
     isBpmChannelClosed = true
-    
+
     // 安全关闭广播通道
     try {
       bpmChannel.close()
     } catch (error) {
       console.error('关闭广播通道失败:', error)
     }
-    
+
     // 关闭WebSocket连接
     try {
       close()
@@ -633,7 +640,7 @@ export const useWebSocketMessage = () => {
       console.error('关闭WebSocket连接失败:', error)
     }
   })
-  
+
   // 初始化连接
   nextTick(() => {
     initConnection()

@@ -2,12 +2,13 @@
   <el-drawer
     v-model="visible"
     :title="title"
-    :size="size"
+    :size="drawerSize"
     :destroy-on-close="true"
     :close-on-click-modal="true"
     :with-overlay="true"
     :modal="true"
     direction="rtl"
+    custom-class="draft-drawer"
   >
     <template #header>
       <div class="flex items-center justify-between w-full">
@@ -69,7 +70,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, onUnmounted } from 'vue'
 import { Delete, Refresh } from '@element-plus/icons-vue'
 import * as DraftApi from '@/api/bpm/draft'
 import { useMessage } from '@/hooks/web/useMessage'
@@ -90,8 +91,16 @@ const loading = ref(false)
 const draftList = ref<DraftApi.BpmProcessDraftDO[]>([])
 const hoveredDraftId = ref<number | null>(null)
 
+// 移动端检测
+const isMobile = ref(false)
+
 const title = computed(() => '流程草稿列表')
-const size = computed(() => '350px')
+const drawerSize = computed(() => isMobile.value ? '100%' : '350px')
+
+// 检测屏幕尺寸
+const checkMobile = () => {
+  isMobile.value = window.innerWidth <= 768
+}
 
 // 点击ESC键关闭抽屉
 const handleEscKey = (event: KeyboardEvent) => {
@@ -103,11 +112,18 @@ const handleEscKey = (event: KeyboardEvent) => {
 onMounted(() => {
   // 添加ESC键监听
   document.addEventListener('keydown', handleEscKey)
+  // 检测移动端
+  checkMobile()
+  window.addEventListener('resize', checkMobile)
 })
 
 onBeforeUnmount(() => {
   // 移除ESC键监听
   document.removeEventListener('keydown', handleEscKey)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', checkMobile)
 })
 
 // 打开抽屉
@@ -301,5 +317,113 @@ defineExpose({
   bottom: 0;
   background-color: transparent;
   z-index: -1;
+}
+
+/* 移动端抽屉样式优化 */
+@media (max-width: 768px) {
+  :deep(.draft-drawer) {
+    .el-drawer__header {
+      padding: 20px;
+      background: linear-gradient(135deg, #409EFF 0%, #67C23A 100%);
+      color: white;
+      border-bottom: none;
+      
+      .el-drawer__title {
+        font-size: 18px;
+        font-weight: 600;
+        color: white;
+      }
+      
+      .el-drawer__close-btn {
+        color: white;
+        font-size: 20px;
+        
+        &:hover {
+          color: rgba(255, 255, 255, 0.8);
+        }
+      }
+      
+      .refresh-button {
+        background: rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        
+        &:hover {
+          background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .el-icon {
+          color: white;
+        }
+      }
+    }
+    
+    .el-drawer__body {
+      padding: 20px;
+      
+      .draft-list-container {
+        padding: 0;
+        
+        .draft-list {
+          gap: 15px;
+          
+          .draft-item {
+            padding: 18px 16px;
+            border-radius: 12px;
+            background: var(--el-fill-color-light);
+            border: 1px solid var(--el-border-color-lighter);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            
+            &:hover {
+              background: var(--el-fill-color);
+              border-color: var(--el-color-primary-light-7);
+              box-shadow: 0 4px 12px rgba(64, 158, 255, 0.15);
+              transform: translateY(-2px);
+            }
+            
+            .draft-content {
+              .draft-name {
+                font-size: 16px;
+                font-weight: 500;
+                margin-bottom: 8px;
+                line-height: 1.4;
+              }
+              
+              .draft-time {
+                font-size: 13px;
+                color: var(--el-text-color-secondary);
+              }
+            }
+            
+            .draft-actions {
+              .el-button {
+                width: 36px;
+                height: 36px;
+                border-radius: 18px;
+                
+                .el-icon {
+                  font-size: 16px;
+                }
+              }
+            }
+          }
+        }
+        
+        .drawer-footer-tip {
+          bottom: 20px;
+          font-size: 13px;
+          color: var(--el-text-color-secondary);
+          
+          p {
+            margin: 0;
+            padding: 8px 16px;
+            background: var(--el-fill-color-lighter);
+            border-radius: 16px;
+            display: inline-block;
+          }
+        }
+      }
+    }
+  }
 }
 </style> 

@@ -864,7 +864,7 @@ export type HttpRequestSetting = {
   // 是否系统任务
   systemTask?: boolean
   // 触发的流程模型编号
-  modelId?: string
+  modelKey?: string
   // 流程模型名称
   modelName?: string
   // 系统任务发起人编号

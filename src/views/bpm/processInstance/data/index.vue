@@ -65,7 +65,7 @@
               />
             </el-select>
           </el-form-item>
-<!--          <el-select
+          <el-select
             v-model="queryParams.category"
             placeholder="流程分类"
             clearable
@@ -78,7 +78,7 @@
               :label="category.name"
               :value="category.code"
             />
-          </el-select>-->
+          </el-select>
 
           <el-select
             v-model="queryParams.status"
@@ -175,13 +175,13 @@
             <template #default="scope">
               <div
                 class="summary-container"
-                v-if="scope.row.summary && scope.row.summary.length > 0"
+                v-if="scope.row.formVariablesDisplay && scope.row.formVariablesDisplay.length > 0"
               >
                 <!-- 摘要内容改为横向排列 -->
                 <div class="summary-row">
                   <!-- 限制最多显示1项摘要 -->
                   <div
-                    v-for="(item, index) in scope.row.summary.slice(0, 1)"
+                    v-for="(item, index) in scope.row.formVariablesDisplay.slice(0, 1)"
                     :key="index"
                     class="summary-item"
                   >
@@ -204,7 +204,7 @@
                       </div>
                     </template>
                     <div class="summary-popover">
-                      <div v-for="(item, index) in scope.row.summary" :key="index" class="mb-5px">
+                      <div v-for="(item, index) in scope.row.formVariablesDisplay" :key="index" class="mb-5px">
                         <el-tag size="small" type="info" class="mr-5px">{{ item.key }}</el-tag>
                         <span>{{ item.value }}</span>
                       </div>
@@ -231,8 +231,8 @@
           </el-table-column>
 
           <el-table-column 
-            label="流程状态" 
-            prop="status" 
+            label="流程状态"
+            prop="status"
             width="120"
             sortable="custom"
             v-if="getColumnVisible('status')"
@@ -573,7 +573,7 @@ const handleCreateProcess = () => {
 
 /** 获取流程分类 */
 const getCategoryList = async () => {
-  categoryList.value = await CategoryApi.getCategorySimpleList()
+  categoryList.value = [{name: "采购", code: "caigou"},{name: "财务", code: "finance"}]
 }
 
 /** 页面激活时刷新数据 */

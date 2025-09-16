@@ -31,12 +31,12 @@
             </el-select>
           </el-col>
           <el-col :xs="24" :sm="24" :md="6" :lg="6">
-            <div class="flex justify-end items-center button-container">
-              <el-button type="primary" @click="handleQuery">搜索</el-button>
-              <el-button @click="resetQuery">重置</el-button>
-              <el-button type="info" @click="handleAdvancedFilterToggle(!showAdvancedFilter)">
-                {{ showAdvancedFilter ? '收起' : '高级筛选' }}
-                <Icon :icon="showAdvancedFilter ? 'ep:arrow-up' : 'ep:arrow-down'" />
+            <div class="button-container">
+              <el-button type="primary" @click="handleQuery" class="action-btn">搜索</el-button>
+              <el-button @click="resetQuery" style="margin-left: 0" class="action-btn">重置</el-button>
+              <el-button type="info"  style="margin-left: 0" @click="handleAdvancedFilterToggle(!showAdvancedFilter)" class="action-btn filter-toggle-btn">
+                <span class="button-text">{{ showAdvancedFilter ? '收起' : '高级筛选' }}</span>
+                <Icon :icon="showAdvancedFilter ? 'ep:arrow-up' : 'ep:arrow-down'" class="button-icon" />
               </el-button>
             </div>
           </el-col>
@@ -91,15 +91,15 @@
     
     <!-- 分页 - 固定底部 -->
     <div class="pagination-container fixed-pagination">
-      <el-pagination
-        v-model:current-page="queryParams.pageNo"
-        v-model:page-size="queryParams.pageSize"
-        :page-sizes="[12, 21, 51, 104]"
-        background
-        layout="total, sizes, prev, pager, next, jumper"
+
+      <Pagination
         :total="total"
-        @size-change="getList"
-        @current-change="getList"
+        v-model:page="queryParams.pageNo"
+        v-model:limit="queryParams.pageSize"
+        :pagerCount="4"
+        @pagination="getList"
+        :hide-on-single-page="false"
+        class="mobile-pagination"
       />
     </div>
   </div>
@@ -479,13 +479,51 @@ onUnmounted(() => {
 .todo-task-container {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 120px);
-  overflow: hidden;
+  min-height: calc(100vh - 120px);
+  overflow: visible;
   position: relative;
+  
+  /* 移动端适配 - 允许整体滚动 */
+  @media (max-width: 768px) {
+    height: auto;
+    min-height: calc(100vh - 80px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    
+    /* 自定义滚动条样式 */
+    &::-webkit-scrollbar {
+      width: 4px;
+    }
+    
+    &::-webkit-scrollbar-thumb {
+      background-color: rgba(144, 147, 153, 0.3);
+      border-radius: 2px;
+    }
+    
+    &::-webkit-scrollbar-track {
+      background-color: transparent;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    min-height: calc(100vh - 60px);
+  }
 }
 
 .fixed-header {
   flex-shrink: 0;
+  
+  /* 移动端头部适配 */
+  @media (max-width: 768px) {
+    position: relative;
+    padding: 12px 16px;
+  }
+  
+  @media (max-width: 480px) {
+    padding: 10px 12px;
+  }
 }
 
 .fixed-search {
@@ -497,6 +535,19 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  
+  /* 移动端搜索栏适配 - 不再固定 */
+  @media (max-width: 768px) {
+    position: relative;
+    padding: 12px 16px;
+    min-height: auto;
+    transform: translateY(0);
+    transition: transform 0.3s ease;
+  }
+  
+  @media (max-width: 480px) {
+    padding: 10px 12px;
+  }
 }
 
 .table-scroll-area {
@@ -522,6 +573,17 @@ onUnmounted(() => {
   /* Firefox 滚动条样式 */
   scrollbar-width: thin;
   scrollbar-color: rgba(144, 147, 153, 0.3) transparent;
+  
+  /* 移动端适配 - 不再单独滚动 */
+  @media (max-width: 768px) {
+    padding: 16px 12px;
+    overflow: visible;
+    flex: none;
+  }
+  
+  @media (max-width: 480px) {
+    padding: 12px 8px;
+  }
 }
 
 .fixed-pagination {
@@ -530,6 +592,47 @@ onUnmounted(() => {
   background-color: #fff;
   border-top: 1px solid #f0f0f0;
   z-index: 5;
+  
+  /* 移动端分页适配 - 不再固定 */
+  @media (max-width: 768px) {
+    position: relative;
+    padding: 12px 16px;
+    margin-bottom: 20px; /* 底部留出空间 */
+    
+    :deep(.el-pagination) {
+      justify-content: center;
+      
+      .el-pagination__sizes,
+      .el-pagination__jump {
+        display: none; /* 移动端隐藏页面大小选择和跳转 */
+      }
+      
+      .el-pager {
+        .number {
+          min-width: 32px;
+          height: 32px;
+          line-height: 32px;
+        }
+      }
+      
+      .btn-prev,
+      .btn-next {
+        min-width: 32px;
+        height: 32px;
+      }
+    }
+  }
+  
+  @media (max-width: 480px) {
+    padding: 10px 12px;
+    margin-bottom: 16px;
+    
+    :deep(.el-pagination) {
+      .el-pagination__total {
+        display: none; /* 小屏幕隐藏总数显示 */
+      }
+    }
+  }
 }
 
 .search-bar {
@@ -537,6 +640,31 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  
+  /* 移动端搜索栏适配 */
+  @media (max-width: 768px) {
+    margin-bottom: 6px;
+    
+    .form-row {
+      flex-direction: column;
+      gap: 10px;
+      
+      .el-col {
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: none !important;
+        margin-bottom: 0;
+      }
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .form-row {
+      gap: 10px;
+      
+      /* 按钮容器样式已在 .button-container 中单独处理 */
+    }
+  }
 }
 
 .form-row {
@@ -548,6 +676,16 @@ onUnmounted(() => {
 .form-control {
   height: 36px;
   margin: 4px 0;
+  
+  /* 移动端表单控件适配 */
+  @media (max-width: 768px) {
+    height: 40px;
+    margin: 0;
+  }
+  
+  @media (max-width: 480px) {
+    height: 38px;
+  }
 }
 
 /* 统一表单控件样式 */
@@ -556,6 +694,14 @@ onUnmounted(() => {
 :deep(.el-select__wrapper),
 :deep(.el-date-editor.el-input__wrapper) {
   height: 36px !important;
+  
+  @media (max-width: 768px) {
+    height: 40px !important;
+  }
+  
+  @media (max-width: 480px) {
+    height: 38px !important;
+  }
 }
 
 :deep(.el-input__wrapper),
@@ -563,6 +709,11 @@ onUnmounted(() => {
 :deep(.el-date-editor.el-input__wrapper) {
   padding-right: 11px !important;
   padding-left: 11px !important;
+  
+  @media (max-width: 768px) {
+    padding-right: 12px !important;
+    padding-left: 12px !important;
+  }
 }
 
 :deep(.el-date-editor) {
@@ -573,27 +724,122 @@ onUnmounted(() => {
 :deep(.el-range-editor.el-input__wrapper) {
   padding: 0 11px !important;
   width: 100% !important;
+  
+  @media (max-width: 768px) {
+    padding: 0 12px !important;
+  }
 }
 
 :deep(.el-input__inner),
 :deep(.el-range-input) {
   height: 34px !important;
   line-height: 34px !important;
+  
+  @media (max-width: 768px) {
+    height: 38px !important;
+    line-height: 38px !important;
+  }
+  
+  @media (max-width: 480px) {
+    height: 36px !important;
+    line-height: 36px !important;
+    font-size: 16px !important; /* 防止iOS自动缩放 */
+  }
 }
 
 :deep(.el-button) {
   height: 36px !important;
+  
+  @media (max-width: 768px) {
+    height: 40px !important;
+  }
+  
+  @media (max-width: 480px) {
+    height: 38px !important;
+  }
 }
 
 .button-container {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
   height: 36px;
   margin: 4px 0;
-  gap: 4px;
+  gap: 8px;
+  flex-wrap: wrap;
+  
+  /* 移动端按钮容器适配 */
+  @media (max-width: 768px) {
+    justify-content: center;
+    height: auto;
+    margin: 8px 0 0 0;
+    gap: 8px;
+    flex-direction: column;
+    
+    .action-btn {
+      width: 100%;
+      height: 40px;
+      font-size: 14px;
+      padding: 0 16px;
+      border-radius: 6px;
+      
+      /* 确保按钮内容居中 */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      
+      .button-text {
+        white-space: nowrap;
+        font-size: 14px;
+      }
+      
+      .button-icon {
+        font-size: 14px;
+        flex-shrink: 0;
+      }
+    }
+  }
+  
+  @media (max-width: 480px) {
+    gap: 6px;
+    margin: 6px 0 0 0;
+    
+    .action-btn {
+      height: 38px;
+      font-size: 14px;
+      padding: 0 14px;
+      border-radius: 5px;
+      
+      .button-text {
+        font-size: 14px;
+      }
+      
+      .button-icon {
+        font-size: 13px;
+      }
+    }
+  }
 }
 
 .advanced-filter {
   padding-top: 8px;
   border-top: 1px solid var(--el-border-color-lighter);
+  
+  /* 移动端高级筛选适配 */
+  @media (max-width: 768px) {
+    padding: 8px 12px;
+    margin-top: 8px;
+    border-radius: 6px;
+    background-color: var(--el-bg-color-page);
+    border: 1px solid var(--el-border-color-lighter);
+  }
+  
+  @media (max-width: 480px) {
+    padding: 6px 10px;
+    margin-top: 6px;
+    border-radius: 4px;
+  }
 }
 
 /* 表单字段相关样式 */
@@ -605,6 +851,16 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   grid-gap: 16px;
+  
+  /* 移动端任务卡片网格适配 */
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    grid-gap: 12px;
+  }
+  
+  @media (max-width: 480px) {
+    grid-gap: 10px;
+  }
 }
 
 .task-card {
@@ -628,6 +884,21 @@ onUnmounted(() => {
   &:hover {
     transform: translateY(-3px);
     box-shadow: var(--el-box-shadow);
+    
+    /* 移动端禁用悬停效果 */
+    @media (max-width: 768px) {
+      transform: none;
+    }
+  }
+  
+  /* 移动端卡片适配 */
+  @media (max-width: 768px) {
+    padding: 14px;
+  }
+  
+  @media (max-width: 480px) {
+    padding: 12px;
+    border-radius: 6px;
   }
 }
 

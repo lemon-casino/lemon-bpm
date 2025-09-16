@@ -199,7 +199,7 @@ function isLikelyId(text: string | null | undefined): boolean {
     // console.log('isLikelyId: 文本仅包含空白字符，判断为ID')
     return true
   }
-  
+
   // 检查是否包含中文字符，如果包含中文，则不是ID
   if (/[\u4e00-\u9fa5]/.test(text)) {
     // console.log('isLikelyId: 文本包含中文字符，判断为非ID')
@@ -285,6 +285,16 @@ export const useApiSelect = (option: ApiSelectProps) => {
       remoteField: {
         type: String,
         default: 'label'
+      },
+      // 联动字段映射
+      linkField: {
+        type: String,
+        default: ''
+      },
+      // form-create 注入对象
+      formCreateInject: {
+        type: Object,
+        default: null
       }
     },
     setup(props) {
@@ -552,14 +562,14 @@ export const useApiSelect = (option: ApiSelectProps) => {
 
           // 检查现有选项中是否已有此值
           const existingOption = options.value.find((opt) => String(opt.value) === stringValue)
-          
+
           // 检查是否有缓存标签
           const cachedLabel = modelValueLabels.value[stringValue]
-          
+
           // 如果有缓存标签，无论是否已有选项，都创建临时选项，确保使用最新的标签
           if (cachedLabel) {
             console.log(`使用缓存标签 [${cachedLabel}] 创建临时选项`)
-            
+
             tempOptions.value.push({
               label: cachedLabel,
               value: attrs.modelValue
@@ -590,14 +600,14 @@ export const useApiSelect = (option: ApiSelectProps) => {
 
             // 检查现有选项中是否已有此值
             const existingOption = options.value.find((opt) => String(opt.value) === stringValue)
-            
+
             // 检查是否有缓存标签
             const cachedLabel = modelValueLabels.value[stringValue]
-            
+
             // 如果有缓存标签，无论是否已有选项，都创建临时选项，确保使用最新的标签
             if (cachedLabel) {
               console.log(`使用缓存标签 [${cachedLabel}] 创建临时选项 (值: ${stringValue})`)
-              
+
               tempOptions.value.push({
                 label: cachedLabel,
                 value: value
@@ -627,7 +637,16 @@ export const useApiSelect = (option: ApiSelectProps) => {
       function parseOptions(data: any) {
         //  情况一：如果有自定义解析函数优先使用自定义解析
         if (!isEmpty(props.parseFunc)) {
-          options.value = parseFunc()?.(data)
+          const parsed = parseFunc()?.(data)
+          if (Array.isArray(parsed)) {
+            // 兼容自定义解析函数未返回原始数据的情况
+            options.value = parsed.map((opt: any) => ({
+              ...opt,
+              raw: opt.raw ?? opt
+            }))
+          } else {
+            options.value = parsed
+          }
           return
         }
 
@@ -657,7 +676,8 @@ export const useApiSelect = (option: ApiSelectProps) => {
         if (Array.isArray(data)) {
           options.value = data.map((item: any) => ({
             label: parseExpression(item, props.labelField),
-            value: parseExpression(item, props.valueField)
+            value: parseExpression(item, props.valueField),
+            raw: item
           }))
           return
         }
@@ -713,6 +733,41 @@ export const useApiSelect = (option: ApiSelectProps) => {
           await getOptions()
         } finally {
           loading.value = false
+        }
+      }
+
+      // 触发 change 事件时，额外返回选中项的原始数据
+      const applyLinkField = (raw: any | any[]) => {
+        if (!props.linkField || !props.formCreateInject) return
+        const map = jsonParse(props.linkField) || {}
+        const api = props.formCreateInject.api || props.formCreateInject.fapi
+        if (!api || typeof map !== 'object') return
+        Object.entries(map).forEach(([source, target]) => {
+          if (Array.isArray(raw)) {
+            const values = raw
+              .map((item) => item && item[source])
+              .filter((v) => v !== undefined)
+            api.setValue && api.setValue(target as string, values)
+          } else if (raw && raw[source] !== undefined) {
+            api.setValue && api.setValue(target as string, raw[source])
+          }
+        })
+      }
+
+      const triggerChange = (val: any) => {
+        const handler = (attrs as any).onChange
+
+        const findItem = (v: any) =>
+          options.value.find((item) => String(item.value) === String(v))
+
+        if (props.multiple && Array.isArray(val)) {
+          const rows = val.map((v) => findItem(v)?.raw)
+          applyLinkField(rows)
+          handler && handler(val, rows)
+        } else {
+          const row = findItem(val)?.raw
+          applyLinkField(row)
+          handler && handler(val, row)
         }
       }
 
@@ -891,20 +946,20 @@ export const useApiSelect = (option: ApiSelectProps) => {
           }
           return acc
         }, [] as any[])
-        
+
         // 添加调试日志
-      /*  console.log('buildSelect: 合并后的选项:', uniqueOptions)
-        console.log('buildSelect: 当前的modelValueLabels:', modelValueLabels.value)
-        console.log('buildSelect: 当前选中值:', attrs.modelValue)*/
-        
+        /*  console.log('buildSelect: 合并后的选项:', uniqueOptions)
+          console.log('buildSelect: 当前的modelValueLabels:', modelValueLabels.value)
+          console.log('buildSelect: 当前选中值:', attrs.modelValue)*/
+
         // 遍历uniqueOptions，优先使用modelValueLabels中的缓存标签
         uniqueOptions.forEach(item => {
           const stringValue = String(item.value)
-          
+
           // 检查是否有缓存标签
           if (modelValueLabels.value[stringValue]) {
             const cachedLabel = modelValueLabels.value[stringValue]
-            
+
             // 如果缓存标签不是ID，则使用缓存标签
             if (!isLikelyId(cachedLabel)) {
               // console.log(`buildSelect: 为选项 [${stringValue}] 使用缓存标签 [${cachedLabel}] 替换原始标签 [${item.label}]`)
@@ -916,15 +971,15 @@ export const useApiSelect = (option: ApiSelectProps) => {
             // console.log(`buildSelect: 选项 [${stringValue}] 没有缓存标签，使用原始标签 [${item.label}]`)
           }
         })
-        
+
         // console.log('buildSelect: 更新标签后的选项:', uniqueOptions)
-        
+
         // 确保当前选中的值在选项列表中有对应的选项
         const currentValue = attrs.modelValue
         if (currentValue && !Array.isArray(currentValue)) {
           const stringValue = String(currentValue)
           const existsInOptions = uniqueOptions.some(item => String(item.value) === stringValue)
-          
+
           if (!existsInOptions && modelValueLabels.value[stringValue]) {
             // console.log(`buildSelect: 当前选中值 [${stringValue}] 不在选项列表中，但有缓存标签，添加临时选项`)
             uniqueOptions.push({
@@ -933,12 +988,12 @@ export const useApiSelect = (option: ApiSelectProps) => {
             })
           }
         }
-        
+
         // 创建一个计算属性，用于确定显示值
         // 这个函数将根据当前选中的值和modelValueLabels计算出应该显示的标签
         const getDisplayValue = (value: any) => {
           if (!value) return value;
-          
+
           if (Array.isArray(value)) {
             // 多选模式
             return value.map(v => {
@@ -978,25 +1033,25 @@ export const useApiSelect = (option: ApiSelectProps) => {
             // 在选项列表中查找
             const option = uniqueOptions.find(item => String(item.value) === stringValue);
             if (option) {
-     //         console.log(`getDisplayValue: 使用选项标签 [${option.label}] 显示值 [${stringValue}]`);
+              //         console.log(`getDisplayValue: 使用选项标签 [${option.label}] 显示值 [${stringValue}]`);
               return {
                 value: value,
                 label: option.label
               };
             }
             // 如果都找不到，返回原始值
-          //  console.log(`getDisplayValue: 未找到标签，显示原始值 [${value}]`);
+            //  console.log(`getDisplayValue: 未找到标签，显示原始值 [${value}]`);
             return {
               value: value,
               label: `ID:${stringValue}`
             };
           }
         };
-        
+
         // 获取当前显示值
         const displayValue = getDisplayValue(attrs.modelValue);
-  //      console.log('buildSelect: 当前显示值:', displayValue);
-        
+        //      console.log('buildSelect: 当前显示值:', displayValue);
+
         if (props.multiple) {
           // fix：多写此步是为了解决 multiple 属性问题
           return (
@@ -1009,6 +1064,7 @@ export const useApiSelect = (option: ApiSelectProps) => {
               remote={props.remote}
               {...(props.remote && { remoteMethod: remoteMethod })}
               value-key="value"
+              onChange={triggerChange}
             >
               {{
                 default: () => uniqueOptions.map((item, index) => {
@@ -1040,7 +1096,7 @@ export const useApiSelect = (option: ApiSelectProps) => {
             </el-select>
           )
         }
-        
+
         // 单选模式
         return (
           <el-select
@@ -1051,6 +1107,7 @@ export const useApiSelect = (option: ApiSelectProps) => {
             remote={props.remote}
             {...(props.remote && { remoteMethod: remoteMethod })}
             value-key="value"
+            onChange={triggerChange}
           >
             {{
               default: () => uniqueOptions.map((item, index) => {
@@ -1090,7 +1147,7 @@ export const useApiSelect = (option: ApiSelectProps) => {
           ]
         }
         return (
-          <el-checkbox-group class="w-full" {...attrs}>
+          <el-checkbox-group class="w-full" {...attrs} onChange={triggerChange}>
             {options.value.map((item, index) => (
               <el-checkbox key={index} label={item.value}>
                 {item.label}
@@ -1107,7 +1164,7 @@ export const useApiSelect = (option: ApiSelectProps) => {
           ]
         }
         return (
-          <el-radio-group class="w-full" {...attrs}>
+          <el-radio-group class="w-full" {...attrs} onChange={triggerChange}>
             {options.value.map((item, index) => (
               <el-radio key={index} value={item.value}>
                 {item.label}

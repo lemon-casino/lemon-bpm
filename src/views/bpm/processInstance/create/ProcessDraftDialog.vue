@@ -2,10 +2,12 @@
   <el-dialog
     v-model="visible"
     title="流程草稿箱"
-    width="400px"
+    :width="dialogWidth"
     :destroy-on-close="true"
     :close-on-click-modal="false"
+    :fullscreen="isMobile"
     append-to-body
+    custom-class="draft-dialog"
   >
     <div class="draft-dialog-content">
       <p class="draft-dialog-desc">请选择您要进行的操作：</p>
@@ -39,10 +41,12 @@
   <el-dialog
     v-model="saveFormVisible"
     title="保存草稿"
-    width="400px"
+    :width="dialogWidth"
     :destroy-on-close="true"
     :close-on-click-modal="false"
+    :fullscreen="isMobile"
     append-to-body
+    custom-class="draft-save-dialog"
   >
     <div class="save-form-content">
       <el-form :model="saveForm" ref="saveFormRef" label-position="top">
@@ -70,7 +74,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useMessage } from '@/hooks/web/useMessage'
 import * as DraftApi from '@/api/bpm/draft'
 import { Document, List } from '@element-plus/icons-vue'
@@ -108,6 +112,28 @@ const saveFormVisible = ref(false)
 const saveFormRef = ref<FormInstance>()
 const saveForm = ref({
   name: ''
+})
+
+// 移动端检测
+const isMobile = ref(false)
+
+// 计算对话框宽度
+const dialogWidth = computed(() => {
+  return isMobile.value ? '100%' : '400px'
+})
+
+// 检测屏幕尺寸
+const checkMobile = () => {
+  isMobile.value = window.innerWidth <= 768
+}
+
+onMounted(() => {
+  checkMobile()
+  window.addEventListener('resize', checkMobile)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', checkMobile)
 })
 
 // 打开对话框
@@ -247,8 +273,154 @@ defineExpose({
   vertical-align: middle;
 }
 
+/* 移动端全屏对话框样式 */
+:deep(.draft-dialog.el-dialog--fullscreen) {
+  .el-dialog__header {
+    padding: 20px;
+    background: linear-gradient(135deg, #409EFF 0%, #67C23A 100%);
+    color: white;
+    
+    .el-dialog__title {
+      font-size: 18px;
+      font-weight: 600;
+      color: white;
+    }
+    
+    .el-dialog__headerbtn {
+      .el-dialog__close {
+        color: white;
+        font-size: 20px;
+        
+        &:hover {
+          color: rgba(255, 255, 255, 0.8);
+        }
+      }
+    }
+  }
+  
+  .el-dialog__body {
+    padding: 30px 20px;
+    
+    .draft-dialog-content {
+      text-align: center;
+      
+      .draft-dialog-desc {
+        font-size: 16px;
+        margin-bottom: 30px;
+        color: var(--el-text-color-primary);
+      }
+      
+      .draft-dialog-buttons {
+        .el-row {
+          margin: 0 !important;
+        }
+        
+        .el-col {
+          padding: 0 !important;
+          margin-bottom: 15px;
+          
+          &:last-child {
+            margin-bottom: 0;
+          }
+        }
+        
+        .draft-btn {
+          height: 50px;
+          font-size: 16px;
+          border-radius: 25px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+          
+          &:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+          }
+        }
+      }
+    }
+  }
+  
+  .el-dialog__footer {
+    padding: 20px;
+    border-top: 1px solid var(--el-border-color-lighter);
+    
+    .el-button {
+      min-width: 100px;
+      height: 40px;
+      border-radius: 20px;
+    }
+  }
+}
+
+:deep(.draft-save-dialog.el-dialog--fullscreen) {
+  .el-dialog__header {
+    padding: 20px;
+    background: linear-gradient(135deg, #409EFF 0%, #67C23A 100%);
+    color: white;
+    
+    .el-dialog__title {
+      font-size: 18px;
+      font-weight: 600;
+      color: white;
+    }
+    
+    .el-dialog__headerbtn {
+      .el-dialog__close {
+        color: white;
+        font-size: 20px;
+        
+        &:hover {
+          color: rgba(255, 255, 255, 0.8);
+        }
+      }
+    }
+  }
+  
+  .el-dialog__body {
+    padding: 30px 20px;
+    
+    .save-form-content {
+      .el-form-item {
+        margin-bottom: 20px;
+        
+        .el-form-item__label {
+          font-size: 16px;
+          font-weight: 500;
+          margin-bottom: 8px;
+        }
+        
+        .el-input {
+          .el-input__wrapper {
+            border-radius: 8px;
+            padding: 12px 15px;
+            
+            .el-input__inner {
+              font-size: 16px;
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  .el-dialog__footer {
+    padding: 20px;
+    border-top: 1px solid var(--el-border-color-lighter);
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    
+    .el-button {
+      min-width: 120px;
+      height: 44px;
+      border-radius: 22px;
+      font-size: 16px;
+      font-weight: 500;
+    }
+  }
+}
+
 /* 响应式调整 */
-@media (max-width: 576px) {
+@media (max-width: 768px) {
   .draft-dialog-buttons {
     .el-row {
       margin-left: 0 !important;
@@ -258,7 +430,7 @@ defineExpose({
     .el-col {
       padding-left: 0 !important;
       padding-right: 0 !important;
-      margin-bottom: 10px;
+      margin-bottom: 15px;
       width: 100%;
     }
   }

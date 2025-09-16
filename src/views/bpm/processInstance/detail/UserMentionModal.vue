@@ -1,5 +1,5 @@
 <template>
-  <div class="mention-modal" :style="{ top: position.top, left: position.left, right: position.right, bottom: position.bottom }" @click.stop="preventClose" @mousedown.stop.prevent="preventClose">
+  <div class="mention-modal" :style="{ top: position.top, left: position.left, right: position.right, bottom: position.bottom }" @click.stop="preventClose" @mousedown.stop="preventClose">
     <div class="mention-modal-header">
       <el-input
         v-model="searchText"
@@ -33,7 +33,7 @@
               class="mention-item"
               :class="{ 'highlighted': highlightedUser && highlightedUser.id === user.id }"
               @click.stop="selectUser(user)"
-              @mousedown.stop.prevent="selectUser(user)"
+              @mousedown.stop="selectUser(user)"
               @mouseover.stop="highlightUser(user)"
             >
               <div class="user-avatar">
@@ -72,9 +72,9 @@ const isComposing = ref(false); // 标记输入法组合状态
 
 // 阻止事件冒泡，防止弹窗被关闭
 const preventClose = (e) => {
+  console.log('UserMentionModal内部点击，阻止事件冒泡');
   e.stopPropagation();
-  e.preventDefault();
-  console.log('阻止弹窗关闭事件冒泡');
+  // 不阻止默认行为，让输入框等元素正常工作
 };
 
 // 计算各个位置
@@ -134,7 +134,9 @@ const handleSearch = () => {
 // 选择用户
 const selectUser = (user) => {
   console.log('选择用户:', user);
+  // 发出选择事件
   emit('select', user);
+  // 选择用户后不立即关闭弹窗，让父组件控制关闭时机
 };
 
 // 高亮用户
@@ -179,6 +181,7 @@ const handleKeyNavigation = (event) => {
       break;
     case 'Escape':
       event.preventDefault();
+      console.log('按ESC键关闭弹窗');
       emit('close');
       break;
   }

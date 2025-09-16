@@ -1,24 +1,33 @@
 <template>
-  <ContentWrap :bodyStyle="{ padding: '10px 20px 0' }" class="position-relative">
+  <ContentWrap 
+    :bodyStyle="{ 
+      padding: isMobile ? '8px 12px 0' : '10px 20px 0' 
+    }" 
+    class="position-relative mobile-optimized"
+  >
     <div class="processInstance-wrap-main">
-      <el-scrollbar class="main-scrollbar">
+      <el-scrollbar class="main-scrollbar" :class="{ 'full-height': shouldHideButtonContainer && isMobile }">
         <img
           class="position-absolute right-20px status-icon"
           width="150"
           :src="auditIconsMap[processInstance.status]"
           alt=""
         />
-        <div class="text-#878c93 h-15px process-id">
+        <div class="text-#878c93 process-id" :class="isMobile ? 'h-auto' : 'h-15px'">
           <span class="process-id-text">
             编号：{{ id }}
             <span class="version-tag" v-if="processDefinition?.version">
-              <span class=" px-2 py-1 rounded-full font-bold text-sm">版本：{{ processDefinition.version }}</span>
+              <span class="px-2 py-1 rounded-full font-bold" :class="isMobile ? 'text-xs' : 'text-sm'">
+                版本：{{ processDefinition.version }}
+              </span>
             </span>
           </span>
         </div>
-        <el-divider class="!my-8px divider" />
+        <el-divider class="divider" :class="isMobile ? '!my-6px' : '!my-8px'" />
         <div class="title-status-container">
-          <div class="text-26px font-bold mb-5px process-title">{{ processInstance.name }}</div>
+          <div class="font-bold mb-5px process-title" :class="isMobile ? 'text-20px' : 'text-26px'">
+            {{ processInstance.name }}
+          </div>
           <div class="status-container">
             <dict-tag
               v-if="processInstance.status"
@@ -53,65 +62,45 @@
               <el-icon class="mr-5px"><Link /></el-icon>
               <span>在浏览器打开</span>
             </el-button>
-            
-            <!-- 在线协作按钮 -->
-            <el-button
-              type="primary"
-              link
-              class="collaboration-button"
-              title="查看在线协作用户"
-              @click="showCollaborationPanel"
-            >
-              <el-icon class="mr-5px"><User /></el-icon>
-              <span>在线协作 ({{ confirmedOnlineUsers.size }})</span>
-            </el-button>
-            
-            <!-- 在线用户面板 -->
-            <div class="online-users-container">
-              <FormCollaborationPanel
-                v-if="processDefinition?.formType === BpmModelFormType.NORMAL"
-                :process-users="processUsers"
-                :key="props.id"
-                :confirmed-online-users="confirmedOnlineUsers"
-                :editing-users="editingUsers"
-                ref="collaborationPanelRef"
-              />
-            </div>
           </div>
         </div>
 
-        <div class="flex items-center justify-between mb-10px text-13px min-h-35px user-info-container">
-          <div class="flex items-center gap-5">
-            <div
-              class="bg-gray-100 h-35px rounded-3xl flex items-center p-8px gap-2 dark:color-gray-600 user-avatar-container"
+        <div 
+          class="flex items-center mb-10px user-info-container" 
+          :class="isMobile ? 'gap-3 text-12px h-auto flex-col items-start' : 'gap-5 text-13px h-35px'"
+        >
+          <div
+            class="bg-gray-100 rounded-3xl flex items-center gap-2 dark:color-gray-600 user-avatar-container"
+            :class="isMobile ? 'h-32px p-6px' : 'h-35px p-8px'"
+          >
+            <el-avatar
+              v-if="processInstance?.startUser?.avatar"
+              :src="processInstance?.startUser?.avatar"
+              class="user-avatar"
+              :size="isMobile ? 24 : 28"
+            />
+            <el-avatar 
+              v-else-if="processInstance?.startUser?.nickname" 
+              class="user-avatar"
+              :size="isMobile ? 24 : 28"
             >
-              <el-avatar
-                :size="28"
-                v-if="processInstance?.startUser?.avatar"
-                :src="processInstance?.startUser?.avatar"
-                class="user-avatar"
-              />
-              <el-avatar :size="28" v-else-if="processInstance?.startUser?.nickname" class="user-avatar">
-                {{ processInstance?.startUser?.nickname.substring(0, 1) }}
-              </el-avatar>
-              <span class="user-nickname">{{ processInstance?.startUser?.nickname }}</span>
-            </div>
-            <div class="text-#878c93 submit-time"> {{ formatDate(processInstance.startTime) }} 提交 </div>
+              {{ processInstance?.startUser?.nickname.substring(0, 1) }}
+            </el-avatar>
+            <span class="user-nickname">{{ processInstance?.startUser?.nickname }}</span>
           </div>
-          
-
+          <div class="text-#878c93 submit-time"> 
+            {{ formatDate(processInstance.startTime) }} 提交 
+          </div>
         </div>
 
         <el-tabs v-model="activeTab" class="process-tabs">
           <!-- 表单信息 -->
-          <el-tab-pane label="审批详情" name="form" ref="formTabPaneRef">
-            <div class="form-scroll-area" ref="formScrollAreaRef">
+          <el-tab-pane label="审批详情" name="form">
+            <div class="form-scroll-area">
               <el-scrollbar>
-                <el-row :gutter="10">
+                <el-row :gutter="isMobile ? 0 : 10">
                   <!-- 表单信息 - 响应式布局：在小屏幕下占满宽度 -->
-                  <el-col :xs="24" :sm="24" :md="17" :lg="17" :xl="17" class="!flex !flex-col formCol">
-
-                    
+                  <el-col :xs="24" :sm="24" :md="17" :lg="17" :xl="17" class="!flex !flex-col formCol" :class="isMobile ? 'mobile-form-col' : ''">
                     <!-- 表单信息 -->
                     <div
                       v-loading="processInstanceLoading"
@@ -125,7 +114,6 @@
                           :option="detailForm.option"
                           :rule="detailForm.rule"
                           class="form-component"
-                          @mounted="onFormMounted"
                         />
                       </el-col>
                       <!-- 情况二：业务表单 -->
@@ -135,7 +123,7 @@
                     </div>
                   </el-col>
                   <!-- 审批记录时间线 - 响应式布局 -->
-                  <el-col :xs="24" :sm="24" :md="7" :lg="7" :xl="7" class="timeline-col">
+                  <el-col :xs="24" :sm="24" :md="7" :lg="7" :xl="7" class="timeline-col" :class="isMobile ? 'mobile-timeline-col' : ''">
                     <!-- 审批记录时间线 -->
                     <ProcessInstanceTimeline 
                       :activity-nodes="activityNodes" 
@@ -143,11 +131,18 @@
                     />
                     
                     <!-- 评论列表 -->
-                    <div class="comments-section mt-20px">
-                      <div class="comments-header flex justify-between items-center mb-10px">
-                        <h3 class="text-16px font-bold">流程评论</h3>
-                        <el-button type="primary" size="small" @click="openCommentDialog">
-                          <el-icon class="mr-5px"><Plus /></el-icon>添加评论
+                    <div class="comments-section" :class="isMobile ? 'mt-15px' : 'mt-20px'">
+                      <div class="comments-header flex justify-between items-center" :class="isMobile ? 'mb-8px' : 'mb-10px'">
+                        <h3 class="font-bold" :class="isMobile ? 'text-14px' : 'text-16px'">流程评论</h3>
+                        <el-button 
+                          type="primary" 
+                          :size="isMobile ? 'small' : 'small'" 
+                          @click="openCommentDialog"
+                          :class="isMobile ? 'mobile-add-comment-btn' : ''"
+                        >
+                          <el-icon :class="isMobile ? 'mr-3px' : 'mr-5px'"><Plus /></el-icon>
+                          <span v-if="!isMobile">添加评论</span>
+                          <span v-else>评论</span>
                         </el-button>
                       </div>
                       <div 
@@ -159,15 +154,15 @@
                           <el-empty description="暂无评论" />
                         </div>
                         <div v-else class="comments-items">
-                          <div v-for="(item, index) in commentList" :key="index" class="comment-item">
+                          <div v-for="(item, index) in commentList" :key="index" class="comment-item" :class="isMobile ? 'mobile-comment-item' : ''">
                             <div class="comment-header">
                               <div class="comment-user">
-                                <el-avatar :size="32" :src="item.userAvatar">
+                                <el-avatar :size="isMobile ? 28 : 32" :src="item.userAvatar">
                                   {{ item.userNickname?.substring(0, 1) }}
                                 </el-avatar>
                                 <div class="comment-user-info">
-                                  <div class="comment-user-name">{{ item.userNickname }}</div>
-                                  <div class="comment-time">{{ formatDate(item.createTime) }}</div>
+                                  <div class="comment-user-name" :class="isMobile ? 'text-13px' : 'text-14px'">{{ item.userNickname }}</div>
+                                  <div class="comment-time" :class="isMobile ? 'text-11px' : 'text-12px'">{{ formatDate(item.createTime) }}</div>
                                 </div>
                               </div>
                             </div>
@@ -250,7 +245,11 @@
       </el-scrollbar>
       
       <!-- 操作按钮区域 - 移出滚动区域，放在主容器内 -->
-      <div class="fixed-button-container">
+      <div 
+        class="fixed-button-container" 
+        :class="{ 'mobile-hidden': shouldHideButtonContainer && isMobile }"
+        v-show="!shouldHideButtonContainer || !isMobile"
+      >
         <ProcessInstanceOperationButton
           ref="operationButtonRef"
           :process-instance="processInstance"
@@ -261,6 +260,7 @@
           :writable-fields="writableFields"
           :is-admin="isAdmin"
           @success="refresh"
+          @button-area-visibility-change="handleButtonAreaVisibilityChange"
           class="operation-button"
         />
       </div>
@@ -297,10 +297,8 @@ import rejectSvg from '@/assets/svgs/bpm/reject.svg'
 import cancelSvg from '@/assets/svgs/bpm/cancel.svg'
 import { useEventBus } from '@/hooks/web/useEventBus'
 import { useWebSocketMessage } from '@/hooks/web/useWebSocketMessage'
-import { useFormCollaboration } from '@/hooks/web/useFormCollaboration'
-import FormCollaborationPanel from '@/components/bpm/FormCollaborationPanel.vue'
 import { ElMessage } from 'element-plus'
-import { Share, Link, Plus, User } from '@element-plus/icons-vue'
+import { Share, Link, Plus } from '@element-plus/icons-vue'
 import { ContentWrap } from '@/components/ContentWrap'
 import { useUserStore } from '@/store/modules/user'
 import * as TaskApi from '@/api/bpm/task'
@@ -337,79 +335,14 @@ const writableFields: Array<string> = [] // 表单可以编辑的字段
 const { emit } = useEventBus('processInstance')
 
 // 使用 WebSocket 消息
-const { sendMessage, sendBroadcast, ensureConnection, initConnection } = useWebSocketMessage()
+const { sendMessage, sendBroadcast } = useWebSocketMessage()
 
 // 管理员相关属性
 const isAdmin = ref(false) // 是否为管理员
 
-// 在线用户检测
-const userStore = useUserStore()
-const currentUser = userStore.getUser
-const {
-  processUsers,
-  confirmedOnlineUsers,
-  initCollaboration,
-  broadcastFieldChange,
-  editingUsers,
-  isApplyingRemoteChange
-} = useFormCollaboration({
-  processInstanceId: props.id,
-  currentUser,
-  formApi: fApi
-})
-
-// 协作面板引用
-const collaborationPanelRef = ref(null)
-// 审批详情区域引用
-const formScrollAreaRef = ref(null)
-
-/**
- * 显示在线协作面板
- */
-const showCollaborationPanel = () => {
-  if (collaborationPanelRef.value) {
-    collaborationPanelRef.value.togglePanel()
-  } else {
-    ElMessage.warning('协作面板未加载')
-  }
-}
-
-/**
- * 处理审批详情区域点击事件，点击面板外部时折叠面板
- * 限制在审批详情标签页内，避免影响其他页面导航
- */
-const handleFormAreaClick = (event: MouseEvent) => {
-  // 只在当前标签页为"审批详情"时处理点击事件
-  if (activeTab.value !== 'form') {
-    return
-  }
-  
-  if (collaborationPanelRef.value && !event.target.closest('.collaboration-button')) {
-    // 检查点击是否在协作面板内
-    const panelElement = collaborationPanelRef.value.$el
-    if (panelElement && !panelElement.contains(event.target)) {
-      // 点击在面板外部，折叠面板
-      collaborationPanelRef.value.collapsePanel()
-    }
-  }
-}
-
-// 添加和移除审批详情区域点击事件监听
-onMounted(() => {
-  // 等待DOM渲染完成后绑定事件
-  nextTick(() => {
-    if (formScrollAreaRef.value) {
-      formScrollAreaRef.value.addEventListener('click', handleFormAreaClick)
-    }
-  })
-})
-
-onUnmounted(() => {
-  // 清理事件监听器
-  if (formScrollAreaRef.value) {
-    formScrollAreaRef.value.removeEventListener('click', handleFormAreaClick)
-  }
-})
+// 移动端按钮区域控制
+const isMobile = ref(false) // 是否为移动端
+const shouldHideButtonContainer = ref(false) // 是否应该隐藏按钮容器
 
 /** 获得详情 */
 const getDetail = async (isFromRefresh = false) => {
@@ -476,13 +409,13 @@ const getApprovalDetail = async (isFromRefresh = false) => {
       message.success('已自动加载您的下一个待办任务')
       
       // 强制更新operationButton组件，确保它能获取新任务信息
-      await nextTick(() => {
+      nextTick(() => {
         if (operationButtonRef.value && data.todoTask) {
           console.log('更新操作按钮组件的任务信息')
           operationButtonRef.value.loadTodoTask(data.todoTask)
           //更新审核详情内容
           console.log('开始更新表单内容')
-
+          
           // 刷新表单内容
           if (processDefinition.value.formType === BpmModelFormType.NORMAL && fApi.value) {
             // 直接更新表单值
@@ -490,19 +423,19 @@ const getApprovalDetail = async (isFromRefresh = false) => {
             // 刷新表单
             fApi.value.refresh()
             console.log('表单内容已更新')
-
+            
             // 获取表单字段权限并重新设置
             const formFieldsPermission = data.formFieldsPermission
             if (formFieldsPermission) {
               // 清空可编辑字段列表
               writableFields.splice(0)
-
+              
               // 重置所有字段为只读
               fApi.value?.btn.show(false)
               fApi.value?.resetBtn.show(false)
               //@ts-ignore
               fApi.value?.disabled(true)
-
+              
               // 先将所有字段设为可见，解决字段隐藏后无法重新显示的问题
               if (detailForm.value.rule && detailForm.value.rule.length > 0) {
                 detailForm.value.rule.forEach(rule => {
@@ -512,7 +445,7 @@ const getApprovalDetail = async (isFromRefresh = false) => {
                   }
                 })
               }
-
+              
               // 设置字段权限
               if (isAdmin.value) {
                 enableAllFieldsForAdmin()
@@ -521,13 +454,13 @@ const getApprovalDetail = async (isFromRefresh = false) => {
                   setFieldPermission(item, formFieldsPermission[item])
                 })
               }
-
+              
               // 打印表单权限信息（刷新后）
               console.log('刷新后的表单权限信息:')
               printFormFieldsPermission(formFieldsPermission)
             }
           }
-
+          
           // 更新流程图
           console.log('开始更新流程图')
           getProcessModelView().then(() => {
@@ -802,28 +735,16 @@ const refresh = async () => {
       // 给所有收集到的审批人发送消息
       if (approversToNotify.size > 0) {
         console.log(`找到 ${approversToNotify.size} 个需要通知的审批人`)
+        approversToNotify.forEach(approver => {
+          console.log('发送通知给审批人:', approver.nickname)
+          sendMessage(
+            approver.id,
+            `流程 ${processInstance.value.name} 需要您审批`
+          )
+        })
         
-        try {
-          // 确保WebSocket连接已建立
-          console.log('发送消息前确保WebSocket连接已建立')
-          const connected = await ensureConnection()
-          console.log('WebSocket连接状态:', connected ? '已连接' : '连接失败')
-          
-          // 即使连接失败也尝试发送消息，消息会进入队列
-          for (const approver of approversToNotify) {
-            console.log('发送通知给审批人:', approver.nickname)
-            await sendMessage(
-              approver.id,
-              `流程 ${processInstance.value.name} 需要您审批`
-            )
-          }
-          
-          // 发送广播
-          sendBroadcast('process-approve')
-        } catch (error) {
-          console.error('发送WebSocket消息出错:', error)
-          // 即使出错，消息也已加入队列，将在连接恢复后发送
-        }
+        // 发送广播
+        sendBroadcast('process-approve')
       } else {
         console.log('没有找到需要通知的审批人')
       }
@@ -862,53 +783,33 @@ const refresh = async () => {
 
       // 检查是否有候选审批人
       if (nextNode?.candidateUsers && nextNode.candidateUsers.length > 0) {
-        try {
-          // 确保WebSocket连接已建立
-          console.log('发送消息前确保WebSocket连接已建立')
-          const connected = await ensureConnection()
-          console.log('WebSocket连接状态:', connected ? '已连接' : '连接失败')
-          
-          // 给所有候选审批人发送消息
-          for (const approver of nextNode.candidateUsers) {
-            console.log('通过 activityNodes 发送通知给审批人:', approver.nickname)
+        // 给所有候选审批人发送消息
+        nextNode.candidateUsers.forEach(approver => {
+          console.log('通过 activityNodes 发送通知给审批人:', approver.nickname)
 
-            // 发送消息
-            await sendMessage(
-              approver.id,
-              `流程 ${processInstance.value.name} 需要您审批`
-            )
-          }
-          
-          // 发送广播
-          sendBroadcast('process-approve')
-        } catch (error) {
-          console.error('发送WebSocket消息出错:', error)
-          // 即使出错，消息也已加入队列，将在连接恢复后发送
-        }
+          // 发送消息
+          sendMessage(
+            approver.id,
+            `流程 ${processInstance.value.name} 需要您审批`
+          )
+        })
+        
+        // 发送广播
+        sendBroadcast('process-approve')
       } 
       // 如果有指定审批人
       else if (nextNode?.tasks?.[0]?.assigneeUser) {
-        try {
-          // 确保WebSocket连接已建立
-          console.log('发送消息前确保WebSocket连接已建立')
-          const connected = await ensureConnection()
-          console.log('WebSocket连接状态:', connected ? '已连接' : '连接失败')
-          
-          const assigneeUser = nextNode.tasks[0].assigneeUser
-          console.log('通过 activityNodes 发送通知给指定审批人:', assigneeUser.nickname)
+        const assigneeUser = nextNode.tasks[0].assigneeUser
+        console.log('通过 activityNodes 发送通知给指定审批人:', assigneeUser.nickname)
 
-          // 发送消息
-          await sendMessage(
-            assigneeUser.id,
-            `流程 ${processInstance.value.name} 需要您审批`
-          )
-          
-          // 发送广播
-          sendBroadcast('process-approve')
-        } catch (error) {
-          console.error('发送WebSocket消息出错:', error)
-          // 即使出错，消息也已加入队列，将在连接恢复后发送
-        }
+        // 发送消息
+        sendMessage(
+          assigneeUser.id,
+          `流程 ${processInstance.value.name} 需要您审批`
+        )
+        
+        // 发送广播
+        sendBroadcast('process-approve')
       }
     }
   }
@@ -922,20 +823,9 @@ const userOptions = ref<UserApi.UserVO[]>([]) // 用户列表
 onMounted(async () => {
   console.log('index.vue 组件挂载')
   
-  // 初始化WebSocket连接
-  console.log('初始化WebSocket连接')
-  try {
-    const connected = await initConnection()
-    console.log('WebSocket连接初始化结果:', connected ? '成功' : '失败')
-    
-    // 如果初始化失败，再次尝试确保连接
-    if (!connected) {
-      console.log('WebSocket初始化失败，再次尝试连接')
-      await ensureConnection()
-    }
-  } catch (error) {
-    console.error('WebSocket连接初始化出错:', error)
-  }
+  // 初始化移动端检测
+  checkIsMobile()
+  window.addEventListener('resize', handleResize)
   
   await checkAdminStatus() // 检查管理员状态
   console.log('管理员状态检查完成，isAdmin:', isAdmin.value)
@@ -946,6 +836,11 @@ onMounted(async () => {
   
   // 加载评论列表
   await loadComments()
+})
+
+// 组件卸载时清除事件监听
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
 })
 
 /**
@@ -1211,63 +1106,27 @@ const isHtmlContent = (content: string) => {
   return /<[a-z][\s\S]*>/i.test(content)
 }
 
-// ========== 表单协同编辑相关方法 ==========
-
 /**
- * 表单挂载完成后的处理
+ * 检测移动端设备
  */
-const onFormMounted = () => {
-  console.log('表单挂载完成，初始化协同编辑功能')
-
-  // 初始化在线检测
-  if (processDefinition.value?.formType === BpmModelFormType.NORMAL) {
-    initCollaboration()
-    watch(
-      () => detailForm.value.value,
-      (newVal, oldVal) => {
-        if (!oldVal || isApplyingRemoteChange.value) return
-        for (const key in newVal) {
-          if (newVal[key] !== oldVal[key]) {
-            broadcastFieldChange(key, newVal[key])
-          }
-        }
-      },
-      { deep: true }
-    )
-  }
+const checkIsMobile = () => {
+  isMobile.value = window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
 }
 
 /**
- * 获取字段显示名称映射
+ * 处理按钮区域可见性变化
  */
-
+const handleButtonAreaVisibilityChange = (shouldHide: boolean) => {
+  console.log('index.vue 接收到按钮区域可见性变化:', shouldHide)
+  shouldHideButtonContainer.value = shouldHide
+}
 
 /**
- * 设置协同编辑消息监听器
+ * 监听窗口大小变化
  */
-
-// ========== 生命周期钩子 ==========
-
-onMounted(async () => {
-  console.log('流程实例详情页面挂载')
-  
-  // 初始化 WebSocket 连接
-  await ensureConnection()
-  
-  // 设置协同编辑消息监听
-  
-  // 获取详情数据
-  await getDetail()
-  
-  // 加载评论
-  await loadComments()
-})
-
-onUnmounted(() => {
-  console.log('流程实例详情页面卸载，清理协同编辑功能')
-  
-  // 清理协同编辑功能
-})
+const handleResize = () => {
+  checkIsMobile()
+}
 
 </script>
 
@@ -1276,6 +1135,17 @@ $wrap-padding-height: 20px;
 $wrap-margin-height: 15px;
 $button-height: 51px;
 $process-header-height: 194px;
+
+// 移动端优化类
+.mobile-optimized {
+  /* 移动端整体容器优化 */
+  @media (max-width: 768px) {
+    .el-card {
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+  }
+}
 
 .processInstance-wrap-main {
   height: calc(
@@ -1293,6 +1163,7 @@ $process-header-height: 194px;
   // 主滚动区域
   .main-scrollbar {
     height: calc(100% - 60px); // 默认为底部按钮留出空间
+    transition: height 0.3s ease; // 添加平滑过渡
     
     /* 移动设备适配 */
     @media (max-width: 767px) {
@@ -1302,6 +1173,11 @@ $process-header-height: 194px;
     /* 超小屏幕适配 */
     @media (max-width: 480px) {
       height: calc(100% - 100px); // 超小屏幕上按钮高度更大
+    }
+    
+    /* 当按钮区域隐藏时，滚动区域占用全部高度 */
+    &.full-height {
+      height: 100% !important;
     }
     
     :deep(.el-scrollbar__wrap) {
@@ -1568,14 +1444,75 @@ $process-header-height: 194px;
 
 // Tab页响应式样式
 .process-tabs {
-  @media (max-width: 575px) {
+  @media (max-width: 768px) {
     :deep(.el-tabs__header) {
-      margin-bottom: 10px;
+      margin-bottom: 8px;
+      padding: 0 4px;
+    }
+    
+    :deep(.el-tabs__nav-wrap) {
+      padding: 0;
     }
     
     :deep(.el-tabs__item) {
-      padding: 0 10px;
+      padding: 0 12px;
+      font-size: 14px;
+      height: 36px;
+      line-height: 36px;
     }
+    
+    :deep(.el-tabs__active-bar) {
+      height: 2px;
+    }
+  }
+  
+  @media (max-width: 575px) {
+    :deep(.el-tabs__header) {
+      margin-bottom: 6px;
+      padding: 0 2px;
+    }
+    
+    :deep(.el-tabs__item) {
+      padding: 0 8px;
+      font-size: 13px;
+      height: 34px;
+      line-height: 34px;
+    }
+  }
+}
+
+// 移动端表单列样式
+.mobile-form-col {
+  padding: 0 8px;
+  margin-bottom: 15px;
+}
+
+// 移动端时间线列样式
+.mobile-timeline-col {
+  padding: 0 8px;
+  margin-top: 15px;
+  border-top: 1px solid var(--el-border-color-lighter);
+  padding-top: 15px;
+}
+
+// 移动端评论项样式
+.mobile-comment-item {
+  padding: 8px;
+  
+  .comment-content {
+    padding-left: 36px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+}
+
+// 移动端添加评论按钮样式
+.mobile-add-comment-btn {
+  padding: 4px 8px;
+  font-size: 12px;
+  
+  .el-icon {
+    font-size: 14px;
   }
 }
 
@@ -1620,7 +1557,7 @@ $process-header-height: 194px;
   align-items: center;
   justify-content: center;
   border-radius: 0 0 8px 8px;
-  transition: box-shadow 0.3s;
+  transition: all 0.3s ease; // 添加平滑过渡
   
   /* 确保底部安全区域适配 */
   padding-bottom: env(safe-area-inset-bottom, 0);
@@ -1633,6 +1570,13 @@ $process-header-height: 194px;
   /* 超小屏幕适配 */
   @media (max-width: 480px) {
     min-height: 100px; /* 在超小屏幕上进一步增加高度 */
+  }
+  
+  /* 移动端隐藏按钮容器的样式 */
+  &.mobile-hidden {
+    opacity: 0 !important;
+    transform: translateY(100%) !important;
+    pointer-events: none !important;
   }
 }
 
@@ -1764,6 +1708,52 @@ $process-header-height: 194px;
   }
 }
 
+// 移动端触摸优化
+@media (max-width: 768px) {
+  /* 触摸目标大小优化 */
+  .el-button {
+    min-height: 36px;
+    padding: 8px 12px;
+    
+    &.el-button--small {
+      min-height: 32px;
+      padding: 6px 10px;
+    }
+  }
+  
+  /* 可点击元素的触摸反馈 */
+  .el-tabs__item,
+  .el-button,
+  .comment-item,
+  .user-avatar-container {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+  
+  /* 滚动优化 */
+  .main-scrollbar {
+    -webkit-overflow-scrolling: touch;
+    
+    :deep(.el-scrollbar__wrap) {
+      -webkit-overflow-scrolling: touch;
+    }
+  }
+  
+  /* 输入框优化 */
+  :deep(.el-input__wrapper) {
+    min-height: 36px;
+  }
+  
+  :deep(.el-textarea__inner) {
+    font-size: 16px; // 防止iOS自动缩放
+    line-height: 1.4;
+  }
+}
+
 // 极小屏幕额外优化
 @media (max-width: 450px) {
   .processInstance-wrap-main {
@@ -1778,6 +1768,13 @@ $process-header-height: 194px;
       flex: 1;
       text-align: center;
     }
+  }
+  
+  /* 极小屏幕的按钮优化 */
+  .el-button {
+    font-size: 13px;
+    padding: 6px 8px;
+    min-height: 32px;
   }
 }
 
@@ -1806,29 +1803,6 @@ $process-header-height: 194px;
 
 // 在浏览器中打开按钮样式
 .browser-button {
-  margin-left: 10px;
-  display: flex;
-  align-items: center;
-  white-space: nowrap;
-  
-  @media (max-width: 767px) {
-    margin-left: 5px;
-  }
-  
-  @media (max-width: 575px) {
-    padding: 2px 5px;
-    font-size: 12px;
-  }
-  
-  @media (max-width: 450px) {
-    span {
-      display: none; // 在非常小的屏幕上只显示图标
-    }
-  }
-}
-
-// 在线协作按钮样式
-.collaboration-button {
   margin-left: 10px;
   display: flex;
   align-items: center;
@@ -1920,7 +1894,7 @@ $process-header-height: 194px;
           overflow-wrap: break-word;
           word-break: break-word;
           
-          // 确保内部所有元素都以换行
+          // 确保内部所有元素也都换行
           * {
             white-space: normal;
             word-break: break-word;
@@ -2003,28 +1977,6 @@ $process-header-height: 194px;
       width: 50px !important;
       height: 50px !important;
     }
-  }
-}
-
-// 在线用户容器样式
-.online-users-container {
-  flex-shrink: 0;
-  margin-left: 15px;
-  display: flex;
-  align-items: center;
-  
-  /* 隐藏容器，面板会通过绝对定位显示 */
-  visibility: hidden;
-  height: 0;
-  width: 0;
-  overflow: hidden;
-  
-  @media (max-width: 767px) {
-    margin-left: 10px;
-  }
-  
-  @media (max-width: 575px) {
-    margin-left: 5px;
   }
 }
 </style>

@@ -104,7 +104,8 @@ import FormDesign from './FormDesign.vue'
 import ProcessDesign from './ProcessDesign.vue'
 import { useTagsViewStore } from '@/store/modules/tagsView'
 import ExtraSettings from './ExtraSettings.vue'
-
+import { useWebSocketMessage } from '@/hooks/web/useWebSocketMessage'
+const { sendMessage } = useWebSocketMessage()
 const router = useRouter()
 const { delView } = useTagsViewStore() // 视图操作
 const route = useRoute()
@@ -384,7 +385,17 @@ const handleDeploy = async () => {
     }
 
     // 发布
-    await ModelApi.deployModel(formData.value.id)
+    const newDefinitionId=  await ModelApi.deployModel(formData.value.id)
+    if (newDefinitionId) {
+      await sendMessage(0, {
+        type: 'PROCESS_DEFINITION_VERSION_CHANGED',
+        data: {
+          key: formData.value.key,
+          processDefinitionId: newDefinitionId
+        }
+      })
+      console.log(newDefinitionId)
+    }
     message.success('发布成功')
     // 返回列表页
     await router.push({ name: 'BpmModel' })

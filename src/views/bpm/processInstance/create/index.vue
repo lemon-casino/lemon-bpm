@@ -160,7 +160,7 @@ import * as DefinitionApi from '@/api/bpm/definition'
 import * as ProcessInstanceApi from '@/api/bpm/processInstance'
 import { CategoryApi, CategoryVO } from '@/api/bpm/category'
 import ProcessDefinitionDetail from './ProcessDefinitionDetail.vue'
-import { groupBy, debounce, throttle } from 'lodash-es'
+import { groupBy, debounce, } from 'lodash-es'
 import { subString } from '@/utils/index'
 import { Search } from '@element-plus/icons-vue'
 

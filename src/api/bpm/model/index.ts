@@ -18,6 +18,7 @@ export interface ModelVersionVO {
 // 简单流程模型类型定义
 export interface SimpleModelVO {
   id: string
+  key:string
   formName: string
 }
 
